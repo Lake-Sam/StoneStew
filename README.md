@@ -1,8 +1,10 @@
 [![Build Status](https://github.com/crawl/crawl/workflows/Build/badge.svg)](https://github.com/crawl/crawl/actions/)
 
-# Dungeon Crawl Stone Soup
+# Stone Stew
 
-Dungeon Crawl Stone Soup is a game of dungeon exploration, combat and magic, involving characters of diverse skills, worshipping deities of great power and caprice. To win, you'll need to be a master of tactics and strategy, and prevail against overwhelming odds.
+Stone Stew is a Dungeon Crawl Stone Soup-derived roguelike fork focused on
+towns, friendly NPCs, quests, services, and a larger gold economy while keeping
+the tactical dungeon core.
 
 ## Contents
 
@@ -91,11 +93,15 @@ For large changes, it's always a good idea to [talk with the dev team](#communit
 
 Please be sure to read [docs/develop/coding_conventions.md](crawl-ref/docs/develop/coding_conventions.md) too.
 
-## License and history information
+## License and History Information
 
-Crawl is licensed as GPLv2+. See [LICENSE](LICENSE) for the full text.
+Stone Stew is derived from Dungeon Crawl Stone Soup 0.34.1 and is licensed as
+GPLv2+. See [LICENSE](LICENSE) for the full text.
 
-Crawl is a descendant of Linley's Dungeon Crawl. The final alpha of Linley's Dungeon Crawl (v4.1) was released by Brent Ross in 2005. Since 2006, the Dungeon Crawl Stone Soup team has continued development. [CREDITS.txt](crawl-ref/CREDITS.txt) contains a full list of contributors.
+Dungeon Crawl Stone Soup is a descendant of Linley's Dungeon Crawl. The final
+alpha of Linley's Dungeon Crawl (v4.1) was released by Brent Ross in 2005. Since
+2006, the Dungeon Crawl Stone Soup team has continued development.
+[CREDITS.txt](crawl-ref/CREDITS.txt) contains a full list of contributors.
 
 Crawl uses the following open source packages; thanks to their developers:
 

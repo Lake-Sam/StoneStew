@@ -6,3 +6,6 @@
 *.sublime-workspace
 *.sublime-project
 games.d/
+dist/
+crawl-ref/source/crawl.exe
+crawl-ref/source/build-stone-stew/

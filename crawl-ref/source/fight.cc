@@ -93,6 +93,48 @@ int aux_to_hit()
 
 }
 
+static bool _stone_stew_talk_to_town_npc(const monster& mon)
+{
+    if (!mon.wont_attack())
+        return false;
+
+    if (mon.mname == "Mara the Coinwise")
+    {
+        mpr("\"Coin spends better than blood,\" Mara says. "
+            "\"Bring me a strange artefact later and I will make a fair offer.\"");
+        return true;
+    }
+
+    if (mon.mname == "Old Rellan")
+    {
+        mpr("\"The first stairs are never the first danger,\" Old Rellan says. "
+            "\"Come back when you have seen what waits below.\"");
+        return true;
+    }
+
+    if (mon.mname == "Bethra of the Cot")
+    {
+        mpr("\"Beds are for stories, not statistics,\" Bethra says. "
+            "\"Rest easy here; the town keeps its own watch.\"");
+        return true;
+    }
+
+    if (mon.mname == "Gate Warden")
+    {
+        mpr("\"Steel stays sheathed inside the gate,\" the warden says. "
+            "\"Past it, mind your own skin.\"");
+        return true;
+    }
+
+    if (mon.mname == "townsperson")
+    {
+        mpr("The townsperson gives you a cautious nod.");
+        return true;
+    }
+
+    return false;
+}
+
 static double _to_hit_hit_chance(const monster_info& mi, attack &atk, bool melee,
                                  int to_land, bool is_aux = false)
 {
@@ -466,6 +508,13 @@ bool fight_melee(actor *attacker, actor *defender, bool is_rampage,
         ASSERT(!crawl_state.game_is_arena());
         // Can't damage orbs this way.
         if (mons_is_projectile(defender->type) && !you.confused())
+        {
+            you.turn_is_over = false;
+            return false;
+        }
+
+        if (!simu && !you.confused()
+            && _stone_stew_talk_to_town_npc(*defender->as_monster()))
         {
             you.turn_is_over = false;
             return false;

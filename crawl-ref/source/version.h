@@ -8,8 +8,8 @@
 // change these defs for forks (please)
 // (there are various places in the build system that will also need manual
 // attention, as well as the main menu, etc)
-#define CRAWL "Dungeon Crawl Stone Soup"
-#define CRAWL_SHORT "Crawl"
+#define CRAWL "Stone Stew"
+#define CRAWL_SHORT "Stone Stew"
 // shown in crashes:
 #define CRAWL_BUG_REPORT "https://github.com/crawl/crawl/issues"
 // reminder, modifications of the following should obey the licensing, you

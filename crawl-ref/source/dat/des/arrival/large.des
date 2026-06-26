@@ -7,6 +7,48 @@
 
 : crawl_require('dlua/vault.lua')
 
+###############################################################################
+# 35 x 23
+NAME:   stone_stew_arrival_gate_town
+TAGS:   arrival no_monster_gen no_trap_gen no_rotate transparent
+ORIENT: float
+# Development weight: keep high while Stone Stew town systems are being tested.
+WEIGHT: 10000
+KMONS:  G = vault guard att:good_neutral name:Gate_Warden name_replace ; demon blade | great sword . plate armour | chain mail
+KMONS:  M = human att:good_neutral name:Mara_the_Coinwise name_replace ; dagger . robe
+KMONS:  Q = human att:good_neutral name:Old_Rellan name_replace ; quarterstaff . robe
+KMONS:  I = human att:good_neutral name:Bethra_of_the_Cot name_replace ; club . robe
+KMONS:  T = human att:good_neutral name:townsperson name_replace ; nothing
+KFEAT:  S = general shop
+KFEAT:  F = fountain
+FTILE:  .{+SMQIGT = floor_cobble_brown / floor_pebble_brown / none
+FTILE:  , = floor_grass_dark
+MAP
+,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,,xxxxxxxxxxxxxxxxxxxxxxx,,,,,,
+,,,,,,x.....x.......x.....x,,,,,,,,
+,,,,,,x..M..+...S...+..Q..x,,,,,,,,
+,,,,,,x.....x.......x.....x,,,,,,,,
+,,,,,,xxx+xxxxxxxxxxxxx+xxx,,,,,,,,
+,,,,,,x...................x,,,,,,,,
+,,,,,,x..T............T...x,,,,,,,,
+,,,,,,x.........F.........x,,,,,,,,
+,,,,,,x.........{.........x,,,,,,,,
+,,,,,,x...................x,,,,,,,,
+,,,,,,x..I............T...x,,,,,,,,
+,,,,,,xxx+xxxxxxxxxxxxx+xxx,,,,,,,,
+,,,,,,x.....x.......x.....x,,,,,,,,
+,,,,,,x..G..+.......+..G..x,,,,,,,,
+,,,,,,x.....x.......x.....x,,,,,,,,
+,,,,,,xxxxxxxxxx+++xxxxxxxx,,,,,,,,
+,,,,,,,,,,,,,,,.....,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,.......,,,,,,,,,,,,,,
+,,,,,,,,,,,,,.........,,,,,,,,,,,,,
+,,,,,,,,,,,,....xxx....,,,,,,,,,,,,
+,,,,,,,,,,,....xx@xx....,,,,,,,,,,,
+,,,,,,,,,,....xx...xx....,,,,,,,,,,
+ENDMAP
+
 ##############################################################
 # 35 x 19
 # Ruined Dwarven Fortress Basement

@@ -420,14 +420,14 @@ struct game_modes_menu_item
 
 static const vector<game_modes_menu_item> entries =
 {
-    {GAME_TYPE_NORMAL, "Dungeon Crawl",
-        "Dungeon Crawl: The main game: full of monsters, items, "
-        "gods and danger!" },
+    {GAME_TYPE_NORMAL, "Stone Stew",
+        "Stone Stew: a DCSS-derived roguelike of monsters, items, "
+        "gods, towns and danger!" },
     {GAME_TYPE_CUSTOM_SEED, "Choose Game Seed",
         "Play with a chosen custom dungeon seed." },
-    {GAME_TYPE_TUTORIAL, "Tutorial for Dungeon Crawl",
-        "Tutorial that covers the basics of Dungeon Crawl survival." },
-    {GAME_TYPE_HINTS, "Hints Mode for Dungeon Crawl",
+    {GAME_TYPE_TUTORIAL, "Tutorial for Stone Stew",
+        "Tutorial that covers the basics of Stone Stew survival." },
+    {GAME_TYPE_HINTS, "Hints Mode for Stone Stew",
         "A mostly normal game that provides more advanced hints "
         "than the tutorial."},
     {GAME_TYPE_DESCENT, "Dungeon Descent",
