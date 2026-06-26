@@ -22,9 +22,19 @@ static const char *STONE_STEW_BETHRA_QUEST_KEY =
     "stone_stew_bethra_road_coin_quest";
 static const char *STONE_STEW_TOWN_HOME_KEY = "stone_stew_town_home";
 
+enum stone_stew_quest_state
+{
+    SSQ_UNOFFERED,
+    SSQ_ACTIVE,
+    SSQ_COMPLETED,
+    SSQ_FAILED,
+};
+
 struct stone_stew_quest_def
 {
     const char *prop_key;
+    const char *prereq_key;
+    int prereq_state;
     const char *giver;
     const char *legacy_giver;
     const char *title;
@@ -37,8 +47,10 @@ struct stone_stew_quest_def
     const char *incomplete;
     const char *ready;
     const char *completed;
+    const char *failed;
     int reward_gold;
     bool (*complete)();
+    bool (*fail)();
 };
 
 static bool _stone_stew_rellan_complete()
@@ -55,6 +67,8 @@ static const stone_stew_quest_def STONE_STEW_QUESTS[] =
 {
     {
         STONE_STEW_RELLAN_QUEST_KEY,
+        nullptr,
+        SSQ_UNOFFERED,
         "Old Rellan",
         nullptr,
         "First Depths",
@@ -68,11 +82,15 @@ static const stone_stew_quest_def STONE_STEW_QUESTS[] =
         "\"Not yet,\" Old Rellan says. \"Come back once you reach experience level 2.\"",
         "\"There. Now you have heard the dungeon answer back,\" Old Rellan says.",
         "\"No more errands today,\" Old Rellan says. \"Spend that coin before it spends you.\"",
+        "\"Too late for that lesson now,\" Old Rellan says.",
         25,
         _stone_stew_rellan_complete,
+        nullptr,
     },
     {
         STONE_STEW_BETHRA_QUEST_KEY,
+        nullptr,
+        SSQ_UNOFFERED,
         "Bertha of the Cot",
         "Bethra of the Cot",
         "Road Coin",
@@ -86,8 +104,10 @@ static const stone_stew_quest_def STONE_STEW_QUESTS[] =
         "\"Not enough coin-song yet,\" Bertha says. \"Come back with at least 40 gold pieces.\"",
         "\"There, you have learned the sound of survival,\" Bertha says.",
         "\"No more errands from the inn today,\" Bertha says.",
+        "\"That road has gone cold,\" Bertha says.",
         15,
         _stone_stew_bethra_complete,
+        nullptr,
     },
 };
 
@@ -115,7 +135,7 @@ static bool _stone_stew_mon_is_giver(const monster& mon,
 static int _stone_stew_quest_state(const stone_stew_quest_def& quest)
 {
     if (!you.props.exists(quest.prop_key))
-        return 0;
+        return SSQ_UNOFFERED;
 
     return you.props[quest.prop_key].get_int();
 }
@@ -126,11 +146,29 @@ static void _stone_stew_set_quest_state(const stone_stew_quest_def& quest,
     you.props[quest.prop_key] = state;
 }
 
+static bool _stone_stew_quest_prereq_met(const stone_stew_quest_def& quest)
+{
+    if (!quest.prereq_key)
+        return true;
+
+    if (!you.props.exists(quest.prereq_key))
+        return false;
+
+    return you.props[quest.prereq_key].get_int() >= quest.prereq_state;
+}
+
+static bool _stone_stew_quest_failed(const stone_stew_quest_def& quest)
+{
+    return quest.fail && quest.fail();
+}
+
 static string _stone_stew_quest_offer_text(const stone_stew_quest_def& quest)
 {
     string text = "<yellow>";
     text += quest.title;
     text += "</yellow>\n\n";
+    text += quest.offer;
+    text += "\n\n";
     text += "Giver: ";
     text += quest.giver;
     text += "\nObjective: ";
@@ -141,6 +179,8 @@ static string _stone_stew_quest_offer_text(const stone_stew_quest_def& quest)
     text += quest.risk;
     text += "\nFailure: ";
     text += quest.failure;
+    if (quest.prereq_key)
+        text += "\nPrerequisite: complete earlier work for this giver.";
     text += "\n\n<lightgrey>Press a/y/Enter to accept, d/n/Esc to decline.</lightgrey>";
     return text;
 }
@@ -163,12 +203,16 @@ static string _stone_stew_quest_log_entry(const stone_stew_quest_def& quest)
     text += quest.failure;
     text += "\nStatus: ";
 
-    if (state == 1)
+    if (state == SSQ_ACTIVE)
     {
         text += quest.complete() ? "ready to turn in." : "active.";
     }
-    else
+    else if (state == SSQ_COMPLETED)
         text += "completed.";
+    else if (state == SSQ_FAILED)
+        text += "failed.";
+    else
+        text += "not accepted.";
 
     text += "\n\n";
     return text;
@@ -182,7 +226,7 @@ static string _stone_stew_quest_log_text()
     for (int i = 0; i < STONE_STEW_NUM_QUESTS; ++i)
     {
         const stone_stew_quest_def& quest = STONE_STEW_QUESTS[i];
-        if (_stone_stew_quest_state(quest) == 0)
+        if (_stone_stew_quest_state(quest) == SSQ_UNOFFERED)
             continue;
 
         text += _stone_stew_quest_log_entry(quest);
@@ -232,7 +276,6 @@ private:
 
 static bool _stone_stew_offer_quest(const stone_stew_quest_def& quest)
 {
-    mpr(quest.offer);
     stone_stew_quest_offer_popup offer(quest);
     offer.show();
 
@@ -242,7 +285,7 @@ static bool _stone_stew_offer_quest(const stone_stew_quest_def& quest)
         return true;
     }
 
-    _stone_stew_set_quest_state(quest, 1);
+    _stone_stew_set_quest_state(quest, SSQ_ACTIVE);
     mpr(quest.accepted);
     mpr("You can review accepted quests with <lightgrey>Ctrl+T</lightgrey>.");
     return true;
@@ -308,6 +351,7 @@ static bool _stone_stew_town_npc_quest(const monster& mon)
 {
     bool has_quest = false;
     bool all_done = true;
+    bool blocked_by_prereq = false;
 
     for (int i = 0; i < STONE_STEW_NUM_QUESTS; ++i)
     {
@@ -316,20 +360,33 @@ static bool _stone_stew_town_npc_quest(const monster& mon)
             continue;
 
         has_quest = true;
+        if (!_stone_stew_quest_prereq_met(quest))
+        {
+            blocked_by_prereq = true;
+            continue;
+        }
+
         const int state = _stone_stew_quest_state(quest);
 
-        if (state == 0)
+        if (state == SSQ_UNOFFERED)
             return _stone_stew_offer_quest(quest);
 
-        if (state == 1)
+        if (state == SSQ_ACTIVE)
         {
             all_done = false;
+            if (_stone_stew_quest_failed(quest))
+            {
+                _stone_stew_set_quest_state(quest, SSQ_FAILED);
+                mpr(quest.failed);
+                return true;
+            }
+
             if (quest.complete())
             {
                 mpr(quest.ready);
                 mprf("%s pays you %d gold pieces.", quest.giver, quest.reward_gold);
                 you.add_gold(quest.reward_gold);
-                _stone_stew_set_quest_state(quest, 2);
+                _stone_stew_set_quest_state(quest, SSQ_COMPLETED);
                 return true;
             }
 
@@ -337,12 +394,21 @@ static bool _stone_stew_town_npc_quest(const monster& mon)
             return true;
         }
 
-        if (state == 2)
+        if (state == SSQ_FAILED)
+        {
+            all_done = false;
+            mpr(quest.failed);
+            return true;
+        }
+
+        if (state == SSQ_COMPLETED)
             continue;
     }
 
     if (!has_quest)
         mpr("They have no work for you yet.");
+    else if (blocked_by_prereq)
+        mpr("They are not ready to offer you more work yet.");
     else if (all_done)
     {
         for (int i = 0; i < STONE_STEW_NUM_QUESTS; ++i)
