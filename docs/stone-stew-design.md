@@ -23,6 +23,8 @@ goal. WebTiles can follow after the Windows/local tiles experience is stable.
 - NPC identities are procedural per run, but persistent within that run.
 - NPCs can remember the player across visits.
 - Civilian NPCs should not normally die. Companion NPCs can die permanently.
+- Civilian and service NPC movement should be constrained to the town area they
+  belong to, so they cannot wander across the rest of D:1 or into the dungeon.
 - Player attacks on friendly NPCs require a confirmation prompt.
 - Guards are very strong rather than invincible.
 - Town crimes are tracked per town. If the player murders townsfolk, that town
