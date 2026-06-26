@@ -52,6 +52,8 @@ goal. WebTiles can follow after the Windows/local tiles experience is stable.
 - Quests can fail.
 - Quest dialogue should preview the objective and expected reward before the
   player accepts.
+- Quest offer details should appear inside the centered accept/decline prompt
+  instead of being emitted only as normal chat-log messages.
 - Quest difficulty and reward value should scale from dungeon depth, branch,
   monster/item difficulty, and the player's progression.
 - Quest rewards may include gold, items, randarts, mutations, god piety,
