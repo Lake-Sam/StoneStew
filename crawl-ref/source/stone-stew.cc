@@ -13,6 +13,7 @@
 #include "monster.h"
 #include "player.h"
 #include "prompt.h"
+#include "scroller.h"
 #include "travel.h"
 
 static const char *STONE_STEW_RELLAN_QUEST_KEY =
@@ -35,6 +36,56 @@ static int _stone_stew_rellan_quest_state()
         return 0;
 
     return you.props[STONE_STEW_RELLAN_QUEST_KEY].get_int();
+}
+
+static void _stone_stew_rellan_preview()
+{
+    mpr("<lightgrey>Quest offer: First Depths</lightgrey>");
+    mpr("Objective: reach experience level 2, then return to Old Rellan.");
+    mpr("Reward: 25 gold pieces.");
+    mpr("Risk: low. You only need to survive ordinary D:1 exploration.");
+    mpr("Failure: none yet, but later quest types may fail.");
+}
+
+static string _stone_stew_rellan_log_text()
+{
+    const int state = _stone_stew_rellan_quest_state();
+    string text = "<white>Stone Stew Quest Log</white>\n\n";
+
+    if (state == 0)
+    {
+        text += "<lightgrey>No accepted quests.</lightgrey>\n\n";
+        text += "Old Rellan may have simple work for you in the D:1 town.\n";
+        return text;
+    }
+
+    text += "<yellow>First Depths</yellow>\n";
+    text += "Giver: Old Rellan\n";
+    text += "Objective: reach experience level 2, then return to Old Rellan.\n";
+    text += "Reward: 25 gold pieces.\n";
+    text += "Risk: low.\n";
+    text += "Failure: none yet.\n";
+
+    if (state == 1)
+    {
+        if (you.experience_level >= 2)
+            text += "Status: ready to turn in. Return to Old Rellan.\n";
+        else
+            text += "Status: active. You have not reached experience level 2 yet.\n";
+    }
+    else
+        text += "Status: completed.\n";
+
+    return text;
+}
+
+void stone_stew_display_quest_log()
+{
+    formatted_scroller quest_log(FS_PREWRAPPED_TEXT | FS_EASY_EXIT);
+    quest_log.set_tag("stone-stew-quests");
+    quest_log.set_more();
+    quest_log.add_text(_stone_stew_rellan_log_text());
+    quest_log.show();
 }
 
 static void _stone_stew_show_dialogue_options()
@@ -97,10 +148,12 @@ static bool _stone_stew_town_npc_quest(const monster& mon)
     {
         mpr("\"Step past the gate and survive long enough to learn something,\" "
             "Old Rellan says. \"Reach experience level 2, then return.\"");
+        _stone_stew_rellan_preview();
         if (yesno("Accept Old Rellan's quest?", false, 'y'))
         {
             you.props[STONE_STEW_RELLAN_QUEST_KEY] = 1;
             mpr("Quest accepted: reach experience level 2, then return to Old Rellan.");
+            mpr("You can review accepted quests with <lightgrey>Ctrl+T</lightgrey>.");
         }
         else
             mpr("You decline the work for now.");

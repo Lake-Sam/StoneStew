@@ -129,6 +129,7 @@
 #include "startup.h"
 #include "stash.h"
 #include "state.h"
+#include "stone-stew.h"
 #include "stringutil.h"
 #include "tags.h"
 #include "target.h"
@@ -830,6 +831,7 @@ static bool _cmd_is_repeatable(command_type cmd, bool is_again = false)
     case CMD_DISPLAY_OVERMAP:
     case CMD_DISPLAY_RELIGION:
     case CMD_DISPLAY_RUNES:
+    case CMD_STONE_STEW_QUEST_LOG:
     case CMD_DISPLAY_CHARACTER_STATUS:
     case CMD_DISPLAY_SPELLS:
     case CMD_EXPERIENCE_CHECK:
@@ -2303,6 +2305,11 @@ void process_command(command_type cmd, command_type prev_cmd)
         break;
     case CMD_DISPLAY_RUNES:
         display_runes();
+        redraw_screen();
+        update_screen();
+        break;
+    case CMD_STONE_STEW_QUEST_LOG:
+        stone_stew_display_quest_log();
         redraw_screen();
         update_screen();
         break;

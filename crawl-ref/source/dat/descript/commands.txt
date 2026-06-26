@@ -84,6 +84,15 @@ CMD_DISPLAY_RELIGION verbose
 Displays your god's likes and dislikes, conduct, and your current religious
 standing and divine abilities.
 %%%%
+CMD_STONE_STEW_QUEST_LOG
+
+Display Stone Stew quest log
+%%%%
+CMD_STONE_STEW_QUEST_LOG verbose
+
+Displays accepted Stone Stew quests, including objective, reward, risk, failure
+conditions, and current completion status.
+%%%%
 CMD_DISPLAY_MUTATIONS
 
 Display mutations

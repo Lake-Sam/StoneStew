@@ -1042,6 +1042,7 @@ static void _add_formatted_keyhelp(column_composer &cols)
     _add_command(cols, 1, CMD_DISPLAY_SKILLS, "show skill screen", 2);
     _add_command(cols, 1, CMD_RESISTS_SCREEN, "character overview", 2);
     _add_command(cols, 1, CMD_DISPLAY_RELIGION, "show religion screen", 2);
+    _add_command(cols, 1, CMD_STONE_STEW_QUEST_LOG, "show Stone Stew quest log", 2);
     _add_command(cols, 1, CMD_DISPLAY_MUTATIONS, "show Abilities/mutations", 2);
     _add_command(cols, 1, CMD_DISPLAY_KNOWN_OBJECTS, "show item knowledge", 2);
     _add_command(cols, 1, CMD_MEMORISE_SPELL, "show your spell library", 2);
