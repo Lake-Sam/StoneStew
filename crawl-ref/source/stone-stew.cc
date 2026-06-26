@@ -305,13 +305,13 @@ void stone_stew_display_quest_log()
     quest_log.show();
 }
 
-static void _stone_stew_show_dialogue_options()
+enum stone_stew_dialogue_action
 {
-    mpr("<lightgrey>1</lightgrey> Talk");
-    mpr("<lightgrey>2</lightgrey> Quest");
-    mpr("<lightgrey>3</lightgrey> Trade/services");
-    mpr("<lightgrey>Esc</lightgrey> Leave");
-}
+    SSDA_TALK,
+    SSDA_QUEST,
+    SSDA_TRADE,
+    SSDA_TRAINING,
+};
 
 static bool _stone_stew_town_npc_talk(const monster& mon)
 {
@@ -430,6 +430,15 @@ static bool _stone_stew_town_npc_quest(const monster& mon)
     return true;
 }
 
+static bool _stone_stew_town_npc_has_quest(const monster& mon)
+{
+    for (int i = 0; i < STONE_STEW_NUM_QUESTS; ++i)
+        if (_stone_stew_mon_is_giver(mon, STONE_STEW_QUESTS[i]))
+            return true;
+
+    return false;
+}
+
 static bool _stone_stew_mara_will_buy(const item_def& item)
 {
     return item.defined()
@@ -508,18 +517,141 @@ static bool _stone_stew_mara_buy_randart()
     return true;
 }
 
-static bool _stone_stew_town_npc_services(const monster& mon)
+static bool _stone_stew_town_npc_has_trade(const monster& mon)
+{
+    return mon.mname == "Mara the Coinwise";
+}
+
+static bool _stone_stew_town_npc_has_training(const monster&)
+{
+    return false;
+}
+
+static bool _stone_stew_town_npc_trade(const monster& mon)
 {
     if (mon.mname == "Mara the Coinwise")
     {
         mpr("Mara appraises your pack with professional interest.");
         return _stone_stew_mara_buy_randart();
     }
-    else if (mon.mname == "Bertha of the Cot" || mon.mname == "Bethra of the Cot")
-        mpr("Inn services are not implemented yet.");
-    else
-        mpr("They have no services to offer yet.");
 
+    mpr("They are not trading right now.");
+    return true;
+}
+
+static bool _stone_stew_town_npc_training(const monster&)
+{
+    mpr("They are not offering training right now.");
+    return true;
+}
+
+static string _stone_stew_dialogue_action_name(stone_stew_dialogue_action action)
+{
+    switch (action)
+    {
+    case SSDA_TALK:
+        return "Talk";
+    case SSDA_QUEST:
+        return "Quest";
+    case SSDA_TRADE:
+        return "Trade";
+    case SSDA_TRAINING:
+        return "Training";
+    }
+
+    return "";
+}
+
+static vector<stone_stew_dialogue_action> _stone_stew_dialogue_actions(
+    const monster& mon)
+{
+    vector<stone_stew_dialogue_action> actions;
+
+    actions.push_back(SSDA_TALK);
+
+    if (_stone_stew_town_npc_has_quest(mon))
+        actions.push_back(SSDA_QUEST);
+
+    if (_stone_stew_town_npc_has_trade(mon))
+        actions.push_back(SSDA_TRADE);
+
+    if (_stone_stew_town_npc_has_training(mon))
+        actions.push_back(SSDA_TRAINING);
+
+    return actions;
+}
+
+static void _stone_stew_show_dialogue_options(
+    const vector<stone_stew_dialogue_action>& actions)
+{
+    for (unsigned i = 0; i < actions.size(); ++i)
+    {
+        mprf("<lightgrey>%u</lightgrey> %s",
+             i + 1, _stone_stew_dialogue_action_name(actions[i]).c_str());
+    }
+    mpr("<lightgrey>Esc</lightgrey> Leave");
+}
+
+static bool _stone_stew_run_dialogue_action(stone_stew_dialogue_action action,
+                                            const monster& mon)
+{
+    switch (action)
+    {
+    case SSDA_TALK:
+        return _stone_stew_town_npc_talk(mon);
+    case SSDA_QUEST:
+        return _stone_stew_town_npc_quest(mon);
+    case SSDA_TRADE:
+        return _stone_stew_town_npc_trade(mon);
+    case SSDA_TRAINING:
+        return _stone_stew_town_npc_training(mon);
+    }
+
+    return true;
+}
+
+static bool _stone_stew_try_shortcut_action(
+    int key, const monster& mon,
+    const vector<stone_stew_dialogue_action>& actions)
+{
+    stone_stew_dialogue_action action = SSDA_TALK;
+    bool matched = true;
+
+    switch (toalower(key))
+    {
+    case 't':
+        action = SSDA_TALK;
+        break;
+    case 'q':
+        action = SSDA_QUEST;
+        break;
+    case 'r':
+        action = SSDA_TRADE;
+        break;
+    case '$':
+        action = SSDA_TRADE;
+        break;
+    case 'n':
+        action = SSDA_TRAINING;
+        break;
+    default:
+        matched = false;
+        break;
+    }
+
+    if (!matched)
+        return false;
+
+    for (stone_stew_dialogue_action offered : actions)
+    {
+        if (offered == action)
+        {
+            _stone_stew_run_dialogue_action(action, mon);
+            return true;
+        }
+    }
+
+    mpr("That option is not available from this person.");
     return true;
 }
 
@@ -530,7 +662,9 @@ bool stone_stew_talk_to_town_npc(monster& mon)
 
     stop_running();
     mprf("You speak with %s.", mon.name(DESC_THE).c_str());
-    _stone_stew_show_dialogue_options();
+    const vector<stone_stew_dialogue_action> actions =
+        _stone_stew_dialogue_actions(mon);
+    _stone_stew_show_dialogue_options(actions);
 
     while (true)
     {
@@ -541,23 +675,15 @@ bool stone_stew_talk_to_town_npc(monster& mon)
             return true;
         }
 
-        switch (key)
+        if (key >= '1' && key < '1' + static_cast<int>(actions.size()))
         {
-        case '1':
-        case 't':
-        case 'T':
-            return _stone_stew_town_npc_talk(mon);
-        case '2':
-        case 'Q':
-            return _stone_stew_town_npc_quest(mon);
-        case '3':
-        case 's':
-        case 'S':
-            return _stone_stew_town_npc_services(mon);
-        default:
-            mpr("Choose 1, 2, 3, or Esc.");
-            break;
+            return _stone_stew_run_dialogue_action(actions[key - '1'], mon);
         }
+
+        if (_stone_stew_try_shortcut_action(key, mon, actions))
+            return true;
+
+        mpr("Choose one of the listed options, or Esc.");
     }
 }
 
