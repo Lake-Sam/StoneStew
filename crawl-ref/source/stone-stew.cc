@@ -18,7 +18,78 @@
 
 static const char *STONE_STEW_RELLAN_QUEST_KEY =
     "stone_stew_rellan_first_depth_quest";
+static const char *STONE_STEW_BETHRA_QUEST_KEY =
+    "stone_stew_bethra_road_coin_quest";
 static const char *STONE_STEW_TOWN_HOME_KEY = "stone_stew_town_home";
+
+struct stone_stew_quest_def
+{
+    const char *prop_key;
+    const char *giver;
+    const char *title;
+    const char *offer;
+    const char *objective;
+    const char *reward;
+    const char *risk;
+    const char *failure;
+    const char *accepted;
+    const char *incomplete;
+    const char *ready;
+    const char *completed;
+    int reward_gold;
+    bool (*complete)();
+};
+
+static bool _stone_stew_rellan_complete()
+{
+    return you.experience_level >= 2;
+}
+
+static bool _stone_stew_bethra_complete()
+{
+    return you.gold >= 40;
+}
+
+static const stone_stew_quest_def STONE_STEW_QUESTS[] =
+{
+    {
+        STONE_STEW_RELLAN_QUEST_KEY,
+        "Old Rellan",
+        "First Depths",
+        "\"Step past the gate and survive long enough to learn something,\" "
+        "Old Rellan says.",
+        "Reach experience level 2, then return to Old Rellan.",
+        "25 gold pieces.",
+        "Low. You only need to survive ordinary D:1 exploration.",
+        "None yet, but later quest types may fail.",
+        "Quest accepted: reach experience level 2, then return to Old Rellan.",
+        "\"Not yet,\" Old Rellan says. \"Come back once you reach experience level 2.\"",
+        "\"There. Now you have heard the dungeon answer back,\" Old Rellan says.",
+        "\"No more errands today,\" Old Rellan says. \"Spend that coin before it spends you.\"",
+        25,
+        _stone_stew_rellan_complete,
+    },
+    {
+        STONE_STEW_BETHRA_QUEST_KEY,
+        "Bethra of the Cot",
+        "Road Coin",
+        "\"A town does not run on warnings alone,\" Bethra says. "
+        "\"Show me you can make the dungeon pay for your boots.\"",
+        "Return to Bethra once you have at least 40 gold pieces.",
+        "15 gold pieces.",
+        "Low. Explore D:1, gather loose gold, and return when your purse is heavy enough.",
+        "None yet, but later quest types may fail.",
+        "Quest accepted: gather at least 40 gold pieces, then return to Bethra.",
+        "\"Not enough coin-song yet,\" Bethra says. \"Come back with at least 40 gold pieces.\"",
+        "\"There, you have learned the sound of survival,\" Bethra says.",
+        "\"No more errands from the inn today,\" Bethra says.",
+        15,
+        _stone_stew_bethra_complete,
+    },
+};
+
+static const int STONE_STEW_NUM_QUESTS =
+    sizeof(STONE_STEW_QUESTS) / sizeof(STONE_STEW_QUESTS[0]);
 
 bool stone_stew_is_town_npc(const monster& mon)
 {
@@ -30,53 +101,140 @@ bool stone_stew_is_town_npc(const monster& mon)
                || mon.mname == "townsperson");
 }
 
-static int _stone_stew_rellan_quest_state()
+static int _stone_stew_quest_state(const stone_stew_quest_def& quest)
 {
-    if (!you.props.exists(STONE_STEW_RELLAN_QUEST_KEY))
+    if (!you.props.exists(quest.prop_key))
         return 0;
 
-    return you.props[STONE_STEW_RELLAN_QUEST_KEY].get_int();
+    return you.props[quest.prop_key].get_int();
 }
 
-static void _stone_stew_rellan_preview()
+static void _stone_stew_set_quest_state(const stone_stew_quest_def& quest,
+                                        int state)
 {
-    mpr("<lightgrey>Quest offer: First Depths</lightgrey>");
-    mpr("Objective: reach experience level 2, then return to Old Rellan.");
-    mpr("Reward: 25 gold pieces.");
-    mpr("Risk: low. You only need to survive ordinary D:1 exploration.");
-    mpr("Failure: none yet, but later quest types may fail.");
+    you.props[quest.prop_key] = state;
 }
 
-static string _stone_stew_rellan_log_text()
+static string _stone_stew_quest_offer_text(const stone_stew_quest_def& quest)
 {
-    const int state = _stone_stew_rellan_quest_state();
-    string text = "<white>Stone Stew Quest Log</white>\n\n";
+    string text = "<yellow>";
+    text += quest.title;
+    text += "</yellow>\n\n";
+    text += "Giver: ";
+    text += quest.giver;
+    text += "\nObjective: ";
+    text += quest.objective;
+    text += "\nReward: ";
+    text += quest.reward;
+    text += "\nRisk: ";
+    text += quest.risk;
+    text += "\nFailure: ";
+    text += quest.failure;
+    text += "\n\n<lightgrey>Press a/y/Enter to accept, d/n/Esc to decline.</lightgrey>";
+    return text;
+}
 
-    if (state == 0)
-    {
-        text += "<lightgrey>No accepted quests.</lightgrey>\n\n";
-        text += "Old Rellan may have simple work for you in the D:1 town.\n";
-        return text;
-    }
-
-    text += "<yellow>First Depths</yellow>\n";
-    text += "Giver: Old Rellan\n";
-    text += "Objective: reach experience level 2, then return to Old Rellan.\n";
-    text += "Reward: 25 gold pieces.\n";
-    text += "Risk: low.\n";
-    text += "Failure: none yet.\n";
+static string _stone_stew_quest_log_entry(const stone_stew_quest_def& quest)
+{
+    const int state = _stone_stew_quest_state(quest);
+    string text = "<yellow>";
+    text += quest.title;
+    text += "</yellow>\n";
+    text += "Giver: ";
+    text += quest.giver;
+    text += "\nObjective: ";
+    text += quest.objective;
+    text += "\nReward: ";
+    text += quest.reward;
+    text += "\nRisk: ";
+    text += quest.risk;
+    text += "\nFailure: ";
+    text += quest.failure;
+    text += "\nStatus: ";
 
     if (state == 1)
     {
-        if (you.experience_level >= 2)
-            text += "Status: ready to turn in. Return to Old Rellan.\n";
-        else
-            text += "Status: active. You have not reached experience level 2 yet.\n";
+        text += quest.complete() ? "ready to turn in." : "active.";
     }
     else
-        text += "Status: completed.\n";
+        text += "completed.";
+
+    text += "\n\n";
+    return text;
+}
+
+static string _stone_stew_quest_log_text()
+{
+    string text = "<white>Stone Stew Quest Log</white>\n\n";
+    bool found = false;
+
+    for (int i = 0; i < STONE_STEW_NUM_QUESTS; ++i)
+    {
+        const stone_stew_quest_def& quest = STONE_STEW_QUESTS[i];
+        if (_stone_stew_quest_state(quest) == 0)
+            continue;
+
+        text += _stone_stew_quest_log_entry(quest);
+        found = true;
+    }
+
+    if (!found)
+        text += "<lightgrey>No accepted quests.</lightgrey>\n\nTalk to townspeople in Stone Stew towns to find work.\n";
 
     return text;
+}
+
+class stone_stew_quest_offer_popup : public formatted_scroller
+{
+public:
+    stone_stew_quest_offer_popup(const stone_stew_quest_def& quest)
+        : formatted_scroller(FS_PREWRAPPED_TEXT, _stone_stew_quest_offer_text(quest))
+    {
+        set_tag("stone-stew-quest-offer");
+        set_title(formatted_string::parse_string("<white>Quest Offer</white>"));
+        set_more(formatted_string::parse_string("<lightgrey>a</lightgrey> Accept  <lightgrey>d</lightgrey> Decline"));
+    }
+
+    bool accepted() const { return m_accepted; }
+
+private:
+    maybe_bool process_key(int ch) override
+    {
+        const int key = toalower(ch);
+        if (key == 'a' || key == 'y' || key == CK_ENTER)
+        {
+            m_accepted = true;
+            return false;
+        }
+
+        if (key == 'd' || key == 'n' || key_is_escape(key))
+        {
+            m_accepted = false;
+            return false;
+        }
+
+        return formatted_scroller::process_key(ch);
+    }
+
+    bool m_accepted = false;
+};
+
+static bool _stone_stew_offer_quest(const stone_stew_quest_def& quest)
+{
+    mpr(quest.offer);
+    stone_stew_quest_offer_popup offer(quest);
+    offer.show();
+
+    if (!offer.accepted())
+    {
+        mpr("You decline the work for now.");
+        return true;
+    }
+
+    _stone_stew_set_quest_state(quest, 1);
+    mpr(quest.accepted);
+    mpr("You can review accepted quests with <lightgrey>Ctrl+T</lightgrey>.");
+    return true;
 }
 
 void stone_stew_display_quest_log()
@@ -84,7 +242,7 @@ void stone_stew_display_quest_log()
     formatted_scroller quest_log(FS_PREWRAPPED_TEXT | FS_EASY_EXIT);
     quest_log.set_tag("stone-stew-quests");
     quest_log.set_more();
-    quest_log.add_text(_stone_stew_rellan_log_text());
+    quest_log.add_text(_stone_stew_quest_log_text());
     quest_log.show();
 }
 
@@ -137,46 +295,56 @@ static bool _stone_stew_town_npc_talk(const monster& mon)
 
 static bool _stone_stew_town_npc_quest(const monster& mon)
 {
-    if (mon.mname != "Old Rellan")
+    bool has_quest = false;
+    bool all_done = true;
+
+    for (int i = 0; i < STONE_STEW_NUM_QUESTS; ++i)
     {
+        const stone_stew_quest_def& quest = STONE_STEW_QUESTS[i];
+        if (mon.mname != quest.giver)
+            continue;
+
+        has_quest = true;
+        const int state = _stone_stew_quest_state(quest);
+
+        if (state == 0)
+            return _stone_stew_offer_quest(quest);
+
+        if (state == 1)
+        {
+            all_done = false;
+            if (quest.complete())
+            {
+                mpr(quest.ready);
+                mprf("%s pays you %d gold pieces.", quest.giver, quest.reward_gold);
+                you.add_gold(quest.reward_gold);
+                _stone_stew_set_quest_state(quest, 2);
+                return true;
+            }
+
+            mpr(quest.incomplete);
+            return true;
+        }
+
+        if (state == 2)
+            continue;
+    }
+
+    if (!has_quest)
         mpr("They have no work for you yet.");
-        return true;
-    }
-
-    const int state = _stone_stew_rellan_quest_state();
-    if (state == 0)
+    else if (all_done)
     {
-        mpr("\"Step past the gate and survive long enough to learn something,\" "
-            "Old Rellan says. \"Reach experience level 2, then return.\"");
-        _stone_stew_rellan_preview();
-        if (yesno("Accept Old Rellan's quest?", false, 'y'))
+        for (int i = 0; i < STONE_STEW_NUM_QUESTS; ++i)
         {
-            you.props[STONE_STEW_RELLAN_QUEST_KEY] = 1;
-            mpr("Quest accepted: reach experience level 2, then return to Old Rellan.");
-            mpr("You can review accepted quests with <lightgrey>Ctrl+T</lightgrey>.");
+            const stone_stew_quest_def& quest = STONE_STEW_QUESTS[i];
+            if (mon.mname == quest.giver)
+            {
+                mpr(quest.completed);
+                break;
+            }
         }
-        else
-            mpr("You decline the work for now.");
-        return true;
     }
 
-    if (state == 1)
-    {
-        if (you.experience_level >= 2)
-        {
-            mpr("\"There. Now you have heard the dungeon answer back,\" Old Rellan says.");
-            mpr("Old Rellan pays you 25 gold pieces.");
-            you.add_gold(25);
-            you.props[STONE_STEW_RELLAN_QUEST_KEY] = 2;
-        }
-        else
-        {
-            mpr("\"Not yet,\" Old Rellan says. \"Come back once you reach experience level 2.\"");
-        }
-        return true;
-    }
-
-    mpr("\"No more errands today,\" Old Rellan says. \"Spend that coin before it spends you.\"");
     return true;
 }
 
