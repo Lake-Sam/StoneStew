@@ -55,13 +55,36 @@ if errorlevel 1 pause
 Stone Stew $Version ($Configuration)
 
 Run:
-  crawl.exe
-
-Or double-click:
   Start Stone Stew.bat
+
+Saves are stored next to the installed game in:
+  saves
 
 This is an early development build based on Dungeon Crawl Stone Soup 0.34.1.
 "@ | Set-Content -LiteralPath (Join-Path $PackageDir "RUN-ME.txt") -Encoding ASCII
+
+@"
+@echo off
+cd /d "%~dp0"
+if not exist saves mkdir saves
+start "" "%CD%\saves"
+"@ | Set-Content -LiteralPath (Join-Path $PackageDir "Open Stone Stew Saves.bat") -Encoding ASCII
+
+@"
+@echo off
+cd /d "%~dp0"
+echo This will delete Stone Stew saves and morgue files in:
+echo %CD%
+echo.
+choice /M "Delete saves and morgue"
+if errorlevel 2 exit /b 0
+if exist saves rmdir /s /q saves
+if exist morgue rmdir /s /q morgue
+mkdir saves
+mkdir morgue
+echo Saves and morgue deleted.
+pause
+"@ | Set-Content -LiteralPath (Join-Path $PackageDir "Delete Stone Stew Saves.bat") -Encoding ASCII
 
 if (Get-Command 7z -ErrorAction SilentlyContinue) {
     Push-Location $DistRoot
@@ -118,12 +141,20 @@ SolidCompression=yes
 WizardStyle=modern
 UninstallDisplayName=Stone Stew
 
+[InstallDelete]
+Type: filesandordirs; Name: "{app}\contrib"
+Type: filesandordirs; Name: "{app}\dat"
+Type: filesandordirs; Name: "{app}\docs"
+Type: filesandordirs; Name: "{app}\settings"
+
 [Files]
 Source: "$PackageDirForInno\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\Stone Stew"; Filename: "{app}\Start Stone Stew.bat"; WorkingDir: "{app}"
 Name: "{group}\Stone Stew Direct"; Filename: "{app}\crawl.exe"; WorkingDir: "{app}"
+Name: "{group}\Open Stone Stew Saves"; Filename: "{app}\Open Stone Stew Saves.bat"; WorkingDir: "{app}"
+Name: "{group}\Delete Stone Stew Saves"; Filename: "{app}\Delete Stone Stew Saves.bat"; WorkingDir: "{app}"
 Name: "{userdesktop}\Stone Stew"; Filename: "{app}\Start Stone Stew.bat"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Tasks]
