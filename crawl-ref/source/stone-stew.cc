@@ -217,8 +217,12 @@ bool stone_stew_town_npc_can_move_to(const monster& mon, const coord_def& target
 bool stone_stew_town_npc_prepare_move(monster& mon, const coord_def& target,
                                       movement_type mvflags)
 {
-    if (!stone_stew_is_town_npc(mon) || (mvflags & MV_INTERNAL))
+    if (!stone_stew_is_town_npc(mon)
+        || (mvflags & MV_INTERNAL)
+        || (mvflags & MV_NO_MGRID_UPDATE))
+    {
         return true;
+    }
 
     if (!mon.props.exists(STONE_STEW_TOWN_HOME_KEY))
         mon.props[STONE_STEW_TOWN_HOME_KEY].get_coord() = mon.pos();
