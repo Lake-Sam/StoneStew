@@ -50,6 +50,8 @@ goal. WebTiles can follow after the Windows/local tiles experience is stable.
 - Quest types may include fetch, kill, escort, exploration, rescue, delivery,
   bounty, and Elder Scrolls-inspired multi-step stories.
 - Quests can fail.
+- Quest dialogue should preview the objective and expected reward before the
+  player accepts.
 - Quest difficulty and reward value should scale from dungeon depth, branch,
   monster/item difficulty, and the player's progression.
 - Quest rewards may include gold, items, randarts, mutations, god piety,

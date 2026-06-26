@@ -29,8 +29,6 @@
 #include "god-conduct.h"
 #include "god-passive.h"
 #include "items.h"
-#include "libutil.h"
-#include "macro.h"
 #include "map-knowledge.h"
 #include "message.h"
 #include "mon-abil.h"
@@ -47,6 +45,7 @@
 #include "religion.h"
 #include "shout.h"
 #include "state.h"
+#include "stone-stew.h"
 #include "stringutil.h"
 #include "spl-damage.h"
 #include "spl-summoning.h"
@@ -58,170 +57,6 @@
 #include "transform.h"
 #include "unwind.h"
 #include "xom.h" // XOM_CLOUD_TRAIL_TYPE_KEY
-
-static const char *STONE_STEW_RELLAN_QUEST_KEY = "stone_stew_rellan_first_depth_quest";
-
-static bool _stone_stew_is_town_npc(const monster& mon)
-{
-    return mon.wont_attack()
-           && (mon.mname == "Mara the Coinwise"
-               || mon.mname == "Old Rellan"
-               || mon.mname == "Bethra of the Cot"
-               || mon.mname == "Gate Warden"
-               || mon.mname == "townsperson");
-}
-
-static int _stone_stew_rellan_quest_state()
-{
-    if (!you.props.exists(STONE_STEW_RELLAN_QUEST_KEY))
-        return 0;
-
-    return you.props[STONE_STEW_RELLAN_QUEST_KEY].get_int();
-}
-
-static void _stone_stew_show_dialogue_options()
-{
-    mpr("<lightgrey>1</lightgrey> Talk");
-    mpr("<lightgrey>2</lightgrey> Quest");
-    mpr("<lightgrey>3</lightgrey> Trade/services");
-    mpr("<lightgrey>Esc</lightgrey> Leave");
-}
-
-static bool _stone_stew_town_npc_talk(const monster& mon)
-{
-    if (mon.mname == "Mara the Coinwise")
-    {
-        mpr("\"Coin spends better than blood,\" Mara says. "
-            "\"Bring me a strange artefact later and I will make a fair offer.\"");
-        return true;
-    }
-
-    if (mon.mname == "Old Rellan")
-    {
-        mpr("\"The first stairs are never the first danger,\" Old Rellan says. "
-            "\"Come back when you have earned a scar or two.\"");
-        return true;
-    }
-
-    if (mon.mname == "Bethra of the Cot")
-    {
-        mpr("\"Beds are for stories, not statistics,\" Bethra says. "
-            "\"Rest easy here; the town keeps its own watch.\"");
-        return true;
-    }
-
-    if (mon.mname == "Gate Warden")
-    {
-        mpr("\"Steel stays sheathed inside the gate,\" the warden says. "
-            "\"Past it, mind your own skin.\"");
-        return true;
-    }
-
-    if (mon.mname == "townsperson")
-    {
-        mpr("The townsperson gives you a cautious nod.");
-        return true;
-    }
-
-    return false;
-}
-
-static bool _stone_stew_town_npc_quest(const monster& mon)
-{
-    if (mon.mname != "Old Rellan")
-    {
-        mpr("They have no work for you yet.");
-        return true;
-    }
-
-    const int state = _stone_stew_rellan_quest_state();
-    if (state == 0)
-    {
-        mpr("\"Step past the gate and survive long enough to learn something,\" "
-            "Old Rellan says. \"Reach experience level 2, then return.\"");
-        if (yesno("Accept Old Rellan's quest?", false, 'y'))
-        {
-            you.props[STONE_STEW_RELLAN_QUEST_KEY] = 1;
-            mpr("Quest accepted: reach experience level 2, then return to Old Rellan.");
-        }
-        else
-            mpr("You decline the work for now.");
-        return true;
-    }
-
-    if (state == 1)
-    {
-        if (you.experience_level >= 2)
-        {
-            mpr("\"There. Now you have heard the dungeon answer back,\" Old Rellan says.");
-            mpr("Old Rellan pays you 25 gold pieces.");
-            you.add_gold(25);
-            you.props[STONE_STEW_RELLAN_QUEST_KEY] = 2;
-        }
-        else
-        {
-            mpr("\"Not yet,\" Old Rellan says. \"Come back once you reach experience level 2.\"");
-        }
-        return true;
-    }
-
-    mpr("\"No more errands today,\" Old Rellan says. \"Spend that coin before it spends you.\"");
-    return true;
-}
-
-static bool _stone_stew_town_npc_services(const monster& mon)
-{
-    if (mon.mname == "Mara the Coinwise")
-    {
-        mpr("Mara appraises your pack with professional interest.");
-        mpr("Randart selling is not implemented yet.");
-    }
-    else if (mon.mname == "Bethra of the Cot")
-        mpr("Inn services are not implemented yet.");
-    else
-        mpr("They have no services to offer yet.");
-
-    return true;
-}
-
-static bool _stone_stew_talk_to_town_npc(monster& mon)
-{
-    if (!_stone_stew_is_town_npc(mon))
-        return false;
-
-    stop_running();
-    mprf("You speak with %s.", mon.name(DESC_THE).c_str());
-    _stone_stew_show_dialogue_options();
-
-    while (true)
-    {
-        const int key = getchm();
-        if (key_is_escape(key) || key == ' ' || toalower(key) == 'q')
-        {
-            mpr("You step back from the conversation.");
-            return true;
-        }
-
-        switch (key)
-        {
-        case '1':
-        case 't':
-        case 'T':
-            return _stone_stew_town_npc_talk(mon);
-        case '2':
-        case 'q':
-        case 'Q':
-            return _stone_stew_town_npc_quest(mon);
-        case '3':
-        case 's':
-        case 'S':
-            return _stone_stew_town_npc_services(mon);
-        default:
-            mpr("Choose 1, 2, 3, or Esc.");
-            break;
-        }
-    }
-}
 
 // Move a monster to a given location, in preparation for the player moving to
 // their current location themselves.
@@ -954,7 +789,7 @@ static bool _handle_player_step(const coord_def& targ, int& delay, bool rampagin
         }
         else if (fedhas_passthrough(mon))
             fedhas_move = true;
-        else if (_stone_stew_talk_to_town_npc(*mon))
+        else if (stone_stew_talk_to_town_npc(*mon))
             return false;
         // If this is a monster we want to swap with, see if we can.
         else

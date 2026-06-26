@@ -234,6 +234,7 @@ stairs.o \
 startup.o \
 stash.o \
 state.o \
+stone-stew.o \
 status.o \
 stepdown.o \
 store.o \

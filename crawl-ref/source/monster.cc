@@ -68,6 +68,7 @@
 #include "spl-summoning.h"
 #include "spl-util.h"
 #include "state.h"
+#include "stone-stew.h"
 #include "stringutil.h"
 #include "tag-version.h"
 #include "teleport.h"
@@ -5417,6 +5418,9 @@ bool monster::move_to(const coord_def& newpos, movement_type mvflags, bool defer
     {
         return false;
     }
+
+    if (!stone_stew_town_npc_prepare_move(*this, newpos, mvflags))
+        return false;
 
     // Store current position for later finalisation (but if we have been moved
     // multiple times in sequence before finalisation, which some effects like

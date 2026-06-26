@@ -62,6 +62,7 @@
 #include "spl-util.h"
 #include "spl-zap.h"
 #include "state.h"
+#include "stone-stew.h"
 #include "stringutil.h"
 #include "target.h"
 #include "teleport.h"
@@ -3209,6 +3210,9 @@ bool mon_can_move_to_pos(const monster* mons, const coord_def& delta,
 
     // Bounds check: don't consider moving out of grid!
     if (!in_bounds(targ))
+        return false;
+
+    if (!stone_stew_town_npc_can_move_to(*mons, targ))
         return false;
 
     // Non-friendly and non-good neutral monsters won't enter
