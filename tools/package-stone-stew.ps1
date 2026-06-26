@@ -33,6 +33,11 @@ New-Item -ItemType Directory -Force -Path $PackageDir | Out-Null
 
 Copy-Item -LiteralPath $Exe -Destination $PackageDir
 Copy-Item -LiteralPath (Join-Path $SourceDir "dat") -Destination $PackageDir -Recurse
+Copy-Item -LiteralPath (Join-Path $RepoRoot "crawl-ref/settings") -Destination $PackageDir -Recurse
+Copy-Item -LiteralPath (Join-Path $RepoRoot "crawl-ref/docs") -Destination $PackageDir -Recurse
+New-Item -ItemType Directory -Force -Path (Join-Path $PackageDir "contrib/fonts") | Out-Null
+Copy-Item -LiteralPath (Join-Path $SourceDir "contrib/fonts/DejaVuSans.ttf") -Destination (Join-Path $PackageDir "contrib/fonts")
+Copy-Item -LiteralPath (Join-Path $SourceDir "contrib/fonts/DejaVuSansMono.ttf") -Destination (Join-Path $PackageDir "contrib/fonts")
 Copy-Item -LiteralPath (Join-Path $RepoRoot "README.md") -Destination $PackageDir
 Copy-Item -LiteralPath (Join-Path $RepoRoot "LICENSE") -Destination $PackageDir
 Copy-Item -LiteralPath (Join-Path $RepoRoot "docs/stone-stew-design.md") -Destination $PackageDir
@@ -41,7 +46,8 @@ Copy-Item -LiteralPath (Join-Path $RepoRoot "docs/testing-stone-stew.md") -Desti
 @"
 @echo off
 cd /d "%~dp0"
-crawl.exe
+echo Starting Stone Stew from %CD%
+crawl.exe %*
 if errorlevel 1 pause
 "@ | Set-Content -LiteralPath (Join-Path $PackageDir "Start Stone Stew.bat") -Encoding ASCII
 
@@ -116,14 +122,15 @@ UninstallDisplayName=Stone Stew
 Source: "$PackageDirForInno\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\Stone Stew"; Filename: "{app}\crawl.exe"; WorkingDir: "{app}"
-Name: "{userdesktop}\Stone Stew"; Filename: "{app}\crawl.exe"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{group}\Stone Stew"; Filename: "{app}\Start Stone Stew.bat"; WorkingDir: "{app}"
+Name: "{group}\Stone Stew Direct"; Filename: "{app}\crawl.exe"; WorkingDir: "{app}"
+Name: "{userdesktop}\Stone Stew"; Filename: "{app}\Start Stone Stew.bat"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
 
 [Run]
-Filename: "{app}\crawl.exe"; Description: "Launch Stone Stew"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\Start Stone Stew.bat"; WorkingDir: "{app}"; Description: "Launch Stone Stew"; Flags: postinstall skipifsilent
 "@ | Set-Content -LiteralPath $IssPath -Encoding ASCII
 
     & $Iscc.FullName $IssPath | Out-Host
