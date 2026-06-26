@@ -7,6 +7,9 @@
 
 #include "stone-stew.h"
 
+#include "artefact.h"
+#include "invent.h"
+#include "items.h"
 #include "libutil.h"
 #include "macro.h"
 #include "message.h"
@@ -14,6 +17,8 @@
 #include "player.h"
 #include "prompt.h"
 #include "scroller.h"
+#include "shopping.h"
+#include "stringutil.h"
 #include "travel.h"
 
 static const char *STONE_STEW_RELLAN_QUEST_KEY =
@@ -425,12 +430,90 @@ static bool _stone_stew_town_npc_quest(const monster& mon)
     return true;
 }
 
+static bool _stone_stew_mara_will_buy(const item_def& item)
+{
+    return item.defined()
+           && is_artefact(item)
+           && !is_unrandom_artefact(item)
+           && item.is_identified()
+           && !item_is_equipped(item);
+}
+
+static bool _stone_stew_has_mara_sale_item()
+{
+    for (int i = 0; i < ENDOFPACK; ++i)
+        if (_stone_stew_mara_will_buy(you.inv[i]))
+            return true;
+
+    return false;
+}
+
+static int _stone_stew_randart_sale_price(const item_def& item)
+{
+    const int shop_value = item_value(item, true);
+    const int art_value = artefact_value(item);
+
+    return max(1, min(350, shop_value / 5 + art_value));
+}
+
+static bool _stone_stew_mara_buy_randart()
+{
+    if (!_stone_stew_has_mara_sale_item())
+    {
+        mpr("\"I buy identified strange artefacts,\" Mara says. "
+            "\"Not heirlooms, not mysteries, and not what you are wearing.\"");
+        return true;
+    }
+
+    const int slot = prompt_invent_item(
+        "Sell which identified random artefact?",
+        menu_type::invlist, OSEL_ANY);
+
+    if (slot < 0)
+        return true;
+
+    item_def& item = you.inv[slot];
+    if (!_stone_stew_mara_will_buy(item))
+    {
+        if (!item.defined())
+            mpr("\"Empty hands sell poorly,\" Mara says.");
+        else if (!is_artefact(item))
+            mpr("\"That is no artefact,\" Mara says.");
+        else if (is_unrandom_artefact(item))
+            mpr("\"Some things are too singular to fence,\" Mara says.");
+        else if (!item.is_identified())
+            mpr("\"Bring me a known thing, not a riddle,\" Mara says.");
+        else if (item_is_equipped(item))
+            mpr("\"Take it off first. I do not buy from someone's body,\" Mara says.");
+        else
+            mpr("\"Not that one,\" Mara says.");
+
+        return true;
+    }
+
+    const int payout = _stone_stew_randart_sale_price(item);
+    const string item_name = item.name(DESC_YOUR);
+    const string prompt = make_stringf("Sell %s to Mara for %d gold?",
+                                       item_name.c_str(), payout);
+
+    if (!yesno(prompt.c_str(), true, 'n'))
+    {
+        mpr("\"Keep it, then,\" Mara says. \"The dungeon may yet change its mind.\"");
+        return true;
+    }
+
+    mprf("Mara buys %s for %d gold.", item_name.c_str(), payout);
+    you.add_gold(payout);
+    dec_inv_item_quantity(slot, 1);
+    return true;
+}
+
 static bool _stone_stew_town_npc_services(const monster& mon)
 {
     if (mon.mname == "Mara the Coinwise")
     {
         mpr("Mara appraises your pack with professional interest.");
-        mpr("Randart selling is not implemented yet.");
+        return _stone_stew_mara_buy_randart();
     }
     else if (mon.mname == "Bertha of the Cot" || mon.mname == "Bethra of the Cot")
         mpr("Inn services are not implemented yet.");
