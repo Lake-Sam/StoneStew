@@ -26,6 +26,7 @@ struct stone_stew_quest_def
 {
     const char *prop_key;
     const char *giver;
+    const char *legacy_giver;
     const char *title;
     const char *offer;
     const char *objective;
@@ -55,6 +56,7 @@ static const stone_stew_quest_def STONE_STEW_QUESTS[] =
     {
         STONE_STEW_RELLAN_QUEST_KEY,
         "Old Rellan",
+        nullptr,
         "First Depths",
         "\"Step past the gate and survive long enough to learn something,\" "
         "Old Rellan says.",
@@ -71,18 +73,19 @@ static const stone_stew_quest_def STONE_STEW_QUESTS[] =
     },
     {
         STONE_STEW_BETHRA_QUEST_KEY,
+        "Bertha of the Cot",
         "Bethra of the Cot",
         "Road Coin",
-        "\"A town does not run on warnings alone,\" Bethra says. "
+        "\"A town does not run on warnings alone,\" Bertha says. "
         "\"Show me you can make the dungeon pay for your boots.\"",
-        "Return to Bethra once you have at least 40 gold pieces.",
+        "Return to Bertha once you have at least 40 gold pieces.",
         "15 gold pieces.",
         "Low. Explore D:1, gather loose gold, and return when your purse is heavy enough.",
         "None yet, but later quest types may fail.",
-        "Quest accepted: gather at least 40 gold pieces, then return to Bethra.",
-        "\"Not enough coin-song yet,\" Bethra says. \"Come back with at least 40 gold pieces.\"",
-        "\"There, you have learned the sound of survival,\" Bethra says.",
-        "\"No more errands from the inn today,\" Bethra says.",
+        "Quest accepted: gather at least 40 gold pieces, then return to Bertha.",
+        "\"Not enough coin-song yet,\" Bertha says. \"Come back with at least 40 gold pieces.\"",
+        "\"There, you have learned the sound of survival,\" Bertha says.",
+        "\"No more errands from the inn today,\" Bertha says.",
         15,
         _stone_stew_bethra_complete,
     },
@@ -96,9 +99,17 @@ bool stone_stew_is_town_npc(const monster& mon)
     return mon.wont_attack()
            && (mon.mname == "Mara the Coinwise"
                || mon.mname == "Old Rellan"
+               || mon.mname == "Bertha of the Cot"
                || mon.mname == "Bethra of the Cot"
                || mon.mname == "Gate Warden"
                || mon.mname == "townsperson");
+}
+
+static bool _stone_stew_mon_is_giver(const monster& mon,
+                                     const stone_stew_quest_def& quest)
+{
+    return mon.mname == quest.giver
+           || quest.legacy_giver && mon.mname == quest.legacy_giver;
 }
 
 static int _stone_stew_quest_state(const stone_stew_quest_def& quest)
@@ -270,9 +281,9 @@ static bool _stone_stew_town_npc_talk(const monster& mon)
         return true;
     }
 
-    if (mon.mname == "Bethra of the Cot")
+    if (mon.mname == "Bertha of the Cot" || mon.mname == "Bethra of the Cot")
     {
-        mpr("\"Beds are for stories, not statistics,\" Bethra says. "
+        mpr("\"Beds are for stories, not statistics,\" Bertha says. "
             "\"Rest easy here; the town keeps its own watch.\"");
         return true;
     }
@@ -301,7 +312,7 @@ static bool _stone_stew_town_npc_quest(const monster& mon)
     for (int i = 0; i < STONE_STEW_NUM_QUESTS; ++i)
     {
         const stone_stew_quest_def& quest = STONE_STEW_QUESTS[i];
-        if (mon.mname != quest.giver)
+        if (!_stone_stew_mon_is_giver(mon, quest))
             continue;
 
         has_quest = true;
@@ -337,7 +348,7 @@ static bool _stone_stew_town_npc_quest(const monster& mon)
         for (int i = 0; i < STONE_STEW_NUM_QUESTS; ++i)
         {
             const stone_stew_quest_def& quest = STONE_STEW_QUESTS[i];
-            if (mon.mname == quest.giver)
+            if (_stone_stew_mon_is_giver(mon, quest))
             {
                 mpr(quest.completed);
                 break;
@@ -355,7 +366,7 @@ static bool _stone_stew_town_npc_services(const monster& mon)
         mpr("Mara appraises your pack with professional interest.");
         mpr("Randart selling is not implemented yet.");
     }
-    else if (mon.mname == "Bethra of the Cot")
+    else if (mon.mname == "Bertha of the Cot" || mon.mname == "Bethra of the Cot")
         mpr("Inn services are not implemented yet.");
     else
         mpr("They have no services to offer yet.");
@@ -416,6 +427,9 @@ static int _stone_stew_town_npc_roam_radius(const monster& mon)
 {
     if (mon.mname == "Gate Warden")
         return 5;
+
+    if (mon.mname == "Bertha of the Cot" || mon.mname == "Bethra of the Cot")
+        return 3;
 
     if (mon.mname == "townsperson")
         return 9;
