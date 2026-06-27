@@ -23,8 +23,12 @@
 
 static const char *STONE_STEW_RELLAN_QUEST_KEY =
     "stone_stew_rellan_first_depth_quest";
+static const char *STONE_STEW_RELLAN_SECOND_QUEST_KEY =
+    "stone_stew_rellan_second_depth_quest";
 static const char *STONE_STEW_BETHRA_QUEST_KEY =
     "stone_stew_bethra_road_coin_quest";
+static const char *STONE_STEW_BETHRA_SECOND_QUEST_KEY =
+    "stone_stew_bethra_second_purse_quest";
 static const char *STONE_STEW_TOWN_HOME_KEY = "stone_stew_town_home";
 
 enum stone_stew_quest_state
@@ -63,9 +67,19 @@ static bool _stone_stew_rellan_complete()
     return you.experience_level >= 2;
 }
 
+static bool _stone_stew_rellan_second_complete()
+{
+    return you.experience_level >= 3;
+}
+
 static bool _stone_stew_bethra_complete()
 {
     return you.gold >= 40;
+}
+
+static bool _stone_stew_bethra_second_complete()
+{
+    return you.gold >= 75;
 }
 
 static const stone_stew_quest_def STONE_STEW_QUESTS[] =
@@ -93,6 +107,28 @@ static const stone_stew_quest_def STONE_STEW_QUESTS[] =
         nullptr,
     },
     {
+        STONE_STEW_RELLAN_SECOND_QUEST_KEY,
+        STONE_STEW_RELLAN_QUEST_KEY,
+        SSQ_COMPLETED,
+        "Old Rellan",
+        nullptr,
+        "Second Footing",
+        "\"The dungeon has noticed you now,\" Old Rellan says. "
+        "\"Learn whether your feet still obey when it pushes back.\"",
+        "Reach experience level 3, then return to Old Rellan.",
+        "40 gold pieces.",
+        "Low to moderate. You may need to explore beyond the safest rooms.",
+        "None yet, but later quest types may fail.",
+        "Quest accepted: reach experience level 3, then return to Old Rellan.",
+        "\"Still too green,\" Old Rellan says. \"Come back once you reach experience level 3.\"",
+        "\"Good. Fear is quieter when it has a name,\" Old Rellan says.",
+        "\"I have taught you what I can from this gate,\" Old Rellan says.",
+        "\"That lesson has passed you by,\" Old Rellan says.",
+        40,
+        _stone_stew_rellan_second_complete,
+        nullptr,
+    },
+    {
         STONE_STEW_BETHRA_QUEST_KEY,
         nullptr,
         SSQ_UNOFFERED,
@@ -112,6 +148,28 @@ static const stone_stew_quest_def STONE_STEW_QUESTS[] =
         "\"That road has gone cold,\" Bertha says.",
         15,
         _stone_stew_bethra_complete,
+        nullptr,
+    },
+    {
+        STONE_STEW_BETHRA_SECOND_QUEST_KEY,
+        STONE_STEW_BETHRA_QUEST_KEY,
+        SSQ_COMPLETED,
+        "Bertha of the Cot",
+        "Bethra of the Cot",
+        "Heavy Purse",
+        "\"Coin is not safety,\" Bertha says, \"but it buys blankets, boots, "
+        "and the sort of soup that remembers you.\"",
+        "Return to Bertha once you have at least 75 gold pieces.",
+        "35 gold pieces.",
+        "Low. This rewards steady early exploration and restraint.",
+        "None yet, but later quest types may fail.",
+        "Quest accepted: gather at least 75 gold pieces, then return to Bertha.",
+        "\"That purse still whispers,\" Bertha says. \"Bring me at least 75 gold pieces.\"",
+        "\"There it is. A purse with a spine,\" Bertha says.",
+        "\"No more purse-work today,\" Bertha says. \"Go spend wisely.\"",
+        "\"That purse-work is past saving,\" Bertha says.",
+        35,
+        _stone_stew_bethra_second_complete,
         nullptr,
     },
 };
@@ -416,15 +474,18 @@ static bool _stone_stew_town_npc_quest(const monster& mon)
         mpr("They are not ready to offer you more work yet.");
     else if (all_done)
     {
+        const stone_stew_quest_def *last_completed = nullptr;
         for (int i = 0; i < STONE_STEW_NUM_QUESTS; ++i)
         {
             const stone_stew_quest_def& quest = STONE_STEW_QUESTS[i];
             if (_stone_stew_mon_is_giver(mon, quest))
             {
-                mpr(quest.completed);
-                break;
+                if (_stone_stew_quest_state(quest) == SSQ_COMPLETED)
+                    last_completed = &quest;
             }
         }
+        if (last_completed)
+            mpr(last_completed->completed);
     }
 
     return true;
