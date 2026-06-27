@@ -81,6 +81,16 @@ static const char *STONE_STEW_TOWN_MORAL_TARGET_XL_KEY =
     "stone_stew_town_moral_target_xl";
 static const char *STONE_STEW_TOWN_MORAL_OUTCOME_KEY =
     "stone_stew_town_moral_outcome";
+static const char *STONE_STEW_TOWN_MORAL_IDENTITY_NAME_KEY =
+    "stone_stew_town_moral_identity_name";
+static const char *STONE_STEW_TOWN_MORAL_IDENTITY_ROLE_KEY =
+    "stone_stew_town_moral_identity_role";
+static const char *STONE_STEW_TOWN_MORAL_IDENTITY_TRAIT_KEY =
+    "stone_stew_town_moral_identity_trait";
+static const char *STONE_STEW_TOWN_MORAL_IDENTITY_PRESSURE_KEY =
+    "stone_stew_town_moral_identity_pressure";
+static const char *STONE_STEW_TOWN_MORAL_IDENTITY_VOICE_KEY =
+    "stone_stew_town_moral_identity_voice";
 static const char *STONE_STEW_LLM_NOTICE_KEY =
     "stone_stew_llm_notice";
 static const int STONE_STEW_RELLAN_FIGHTING_TRAINING_COST = 60;
@@ -166,6 +176,7 @@ struct stone_stew_moral_choice
 struct stone_stew_moral_template
 {
     string id;
+    string branches = "any";
     string giver;
     string title;
     string offer;
@@ -179,6 +190,15 @@ struct stone_stew_moral_template
     int base_gold = 20;
     int gold_per_xl = 5;
     stone_stew_moral_choice choices[3];
+};
+
+struct stone_stew_npc_identity
+{
+    string name;
+    string role;
+    string trait;
+    string pressure;
+    string voice;
 };
 
 static string _stone_stew_current_town_name();
@@ -361,17 +381,137 @@ static const stone_stew_quest_def STONE_STEW_QUESTS[] =
 static const int STONE_STEW_NUM_QUESTS =
     sizeof(STONE_STEW_QUESTS) / sizeof(STONE_STEW_QUESTS[0]);
 
-static string _stone_stew_substitute(string text)
-{
-    text = replace_all(text, "{town}", _stone_stew_current_town_name());
-    text = replace_all(text, "{branch}", branches[you.where_are_you].longname);
-    text = replace_all(text, "{xl}", make_stringf("%d", you.experience_level));
-    return text;
-}
-
 static string _stone_stew_town_moral_key(const char *base)
 {
     return string(base) + "_" + make_stringf("%d", you.where_are_you);
+}
+
+static string _stone_stew_pick_identity_field(const char *base_key,
+                                             const char **values,
+                                             int count)
+{
+    const string key = _stone_stew_town_moral_key(base_key);
+    if (!you.props.exists(key))
+        you.props[key] = values[random2(count)];
+
+    return you.props[key].get_string();
+}
+
+static stone_stew_npc_identity _stone_stew_current_moral_identity()
+{
+    static const char *starter_names[] =
+    {
+        "Mavren", "Sella", "Odrik", "Tamsin", "Veyra", "Corren"
+    };
+    static const char *dungeon_names[] =
+    {
+        "Brann", "Istre", "Kelro", "Marn", "Ossin", "Velka"
+    };
+    static const char *lair_names[] =
+    {
+        "Aster", "Brynn", "Elow", "Mirel", "Sorrel", "Thane"
+    };
+    static const char *starter_roles[] =
+    {
+        "gate neighbor", "inn witness", "market runner", "well keeper"
+    };
+    static const char *dungeon_roles[] =
+    {
+        "ledger keeper", "lamp tender", "road clerk", "watch witness"
+    };
+    static const char *lair_roles[] =
+    {
+        "root gatherer", "trail witness", "salve mixer", "beast-path caller"
+    };
+    static const char *traits[] =
+    {
+        "too honest for comfort", "fond of bad jokes", "careful with names",
+        "nervous around easy answers", "polite when frightened"
+    };
+    static const char *pressures[] =
+    {
+        "owes a favor to someone in town",
+        "has heard the same lie from both sides",
+        "wants the matter settled before blood follows",
+        "fears the town will pretend nothing happened"
+    };
+    static const char *voices[] =
+    {
+        "dry and practical", "warm but worried", "ceremonial by habit",
+        "blunt, then apologetic", "quietly amused"
+    };
+
+    const char **names = starter_names;
+    int num_names = ARRAYSZ(starter_names);
+    const char **roles = starter_roles;
+    int num_roles = ARRAYSZ(starter_roles);
+
+    if (you.where_are_you == BRANCH_DWARF)
+    {
+        names = dungeon_names;
+        num_names = ARRAYSZ(dungeon_names);
+        roles = dungeon_roles;
+        num_roles = ARRAYSZ(dungeon_roles);
+    }
+    else if (you.where_are_you == BRANCH_FOREST)
+    {
+        names = lair_names;
+        num_names = ARRAYSZ(lair_names);
+        roles = lair_roles;
+        num_roles = ARRAYSZ(lair_roles);
+    }
+
+    stone_stew_npc_identity identity;
+    identity.name = _stone_stew_pick_identity_field(
+        STONE_STEW_TOWN_MORAL_IDENTITY_NAME_KEY, names, num_names);
+    identity.role = _stone_stew_pick_identity_field(
+        STONE_STEW_TOWN_MORAL_IDENTITY_ROLE_KEY, roles, num_roles);
+    identity.trait = _stone_stew_pick_identity_field(
+        STONE_STEW_TOWN_MORAL_IDENTITY_TRAIT_KEY, traits, ARRAYSZ(traits));
+    identity.pressure = _stone_stew_pick_identity_field(
+        STONE_STEW_TOWN_MORAL_IDENTITY_PRESSURE_KEY, pressures,
+        ARRAYSZ(pressures));
+    identity.voice = _stone_stew_pick_identity_field(
+        STONE_STEW_TOWN_MORAL_IDENTITY_VOICE_KEY, voices, ARRAYSZ(voices));
+    return identity;
+}
+
+static string _stone_stew_substitute(string text)
+{
+    const stone_stew_npc_identity identity =
+        _stone_stew_current_moral_identity();
+    text = replace_all(text, "{town}", _stone_stew_current_town_name());
+    text = replace_all(text, "{branch}", branches[you.where_are_you].longname);
+    text = replace_all(text, "{xl}", make_stringf("%d", you.experience_level));
+    text = replace_all(text, "{npc_name}", identity.name);
+    text = replace_all(text, "{npc_role}", identity.role);
+    text = replace_all(text, "{npc_trait}", identity.trait);
+    text = replace_all(text, "{npc_pressure}", identity.pressure);
+    text = replace_all(text, "{npc_voice}", identity.voice);
+    return text;
+}
+
+static string _stone_stew_current_town_tag()
+{
+    if (you.where_are_you == BRANCH_DWARF)
+        return "dungeon_town";
+
+    if (you.where_are_you == BRANCH_FOREST)
+        return "lair_town";
+
+    return "starter";
+}
+
+static bool _stone_stew_template_matches_current_town(
+    const stone_stew_moral_template& tmpl)
+{
+    const vector<string> tags = split_string(",", tmpl.branches, true);
+    const string current = _stone_stew_current_town_tag();
+    for (const string& tag : tags)
+        if (tag == "any" || tag == current)
+            return true;
+
+    return false;
 }
 
 static string _stone_stew_unescape(string text)
@@ -388,6 +528,8 @@ static void _stone_stew_set_template_field(stone_stew_moral_template& tmpl,
 {
     if (key == "id")
         tmpl.id = value;
+    else if (key == "branches")
+        tmpl.branches = value.empty() ? "any" : value;
     else if (key == "giver")
         tmpl.giver = value;
     else if (key == "title")
@@ -501,6 +643,7 @@ static const stone_stew_moral_template *_stone_stew_current_moral_template()
     if (fallback.id.empty())
     {
         fallback.id = "fallback_moral_cache";
+        fallback.branches = "any";
         fallback.giver = "townsperson";
         fallback.title = "A Borrowed Mercy";
         fallback.offer = "\"Two neighbors claim the same hidden cache,\" "
@@ -544,6 +687,14 @@ static const stone_stew_moral_template *_stone_stew_current_moral_template()
     if (templates.empty())
         return &fallback;
 
+    vector<int> candidates;
+    for (int i = 0; i < static_cast<int>(templates.size()); ++i)
+        if (_stone_stew_template_matches_current_town(templates[i]))
+            candidates.push_back(i);
+
+    if (candidates.empty())
+        return &fallback;
+
     const int branch = static_cast<int>(you.where_are_you);
     const string template_key =
         _stone_stew_town_moral_key(STONE_STEW_TOWN_MORAL_TEMPLATE_KEY);
@@ -555,14 +706,16 @@ static const stone_stew_moral_template *_stone_stew_current_moral_template()
                                != branch;
     if (needs_pick)
     {
-        you.props[template_key] = random2(static_cast<int>(templates.size()));
+        you.props[template_key] = candidates[random2(candidates.size())];
         you.props[branch_key] = branch;
     }
 
     int index = you.props[template_key].get_int();
-    if (index < 0 || index >= static_cast<int>(templates.size()))
+    if (index < 0
+        || index >= static_cast<int>(templates.size())
+        || !_stone_stew_template_matches_current_town(templates[index]))
     {
-        index = 0;
+        index = candidates[random2(candidates.size())];
         you.props[template_key] = index;
     }
 
@@ -685,15 +838,31 @@ static string _stone_stew_extract_json_response(const string& json)
     return trimmed_string(_stone_stew_json_unescape(response));
 }
 
+static string _stone_stew_sanitise_llm_line(string line)
+{
+    line = replace_all(line, "\n", " ");
+    line = replace_all(line, "\r", " ");
+    line = trimmed_string(line);
+    if (line.size() > 180)
+        line = line.substr(0, 177) + "...";
+
+    return line;
+}
+
 static string _stone_stew_llm_flavour(const monster& mon, const string& topic)
 {
+    const stone_stew_npc_identity identity =
+        _stone_stew_current_moral_identity();
+    const string npc_name = mon.mname == "townsperson"
+                            ? identity.name
+                            : mon.name(DESC_PLAIN);
     const string prompt = make_stringf(
         "Write one short in-character line for a Dungeon Crawl Stone Soup fork "
         "NPC. NPC name: %s. Town: %s. Topic: %s. Allowed facts only: towns, "
         "guilds, priests, quests, shops, training, gold, artefacts, Dungeon, "
         "Lair, and the known DCSS gods. Do not invent mechanics. Keep under "
         "24 words.",
-        mon.name(DESC_PLAIN).c_str(), _stone_stew_current_town_name().c_str(),
+        npc_name.c_str(), _stone_stew_current_town_name().c_str(),
         topic.c_str());
 
     const string body = "{\"model\":\"qwen3:1.7b\",\"stream\":false,"
@@ -723,7 +892,8 @@ static string _stone_stew_llm_flavour(const monster& mon, const string& topic)
     pclose(pipe);
 #endif
 
-    return _stone_stew_extract_json_response(output);
+    return _stone_stew_sanitise_llm_line(
+        _stone_stew_extract_json_response(output));
 }
 
 static void _stone_stew_maybe_print_llm_flavour(const monster& mon,
@@ -748,7 +918,23 @@ static string _stone_stew_moral_offer_text(
     text += "</yellow>\n\n";
     text += _stone_stew_substitute(tmpl.offer);
     text += "\n\nGiver: ";
-    text += tmpl.giver;
+    text += tmpl.giver == "townsperson"
+            ? _stone_stew_current_moral_identity().name
+            : tmpl.giver;
+    if (tmpl.giver == "townsperson")
+    {
+        const stone_stew_npc_identity identity =
+            _stone_stew_current_moral_identity();
+        text += ", ";
+        text += identity.role;
+        text += "\nNPC: ";
+        text += identity.trait;
+        text += "; ";
+        text += identity.pressure;
+        text += ". Voice: ";
+        text += identity.voice;
+        text += ".";
+    }
     text += "\nObjective: ";
     text += replace_all(_stone_stew_substitute(tmpl.objective),
                         "{target_xl}", make_stringf("%d", target_xl));
@@ -834,7 +1020,9 @@ static string _stone_stew_moral_log_entry(
     text += _stone_stew_substitute(tmpl.title);
     text += "</yellow>\n";
     text += "Giver: ";
-    text += tmpl.giver;
+    text += tmpl.giver == "townsperson"
+            ? _stone_stew_current_moral_identity().name
+            : tmpl.giver;
     text += " in ";
     text += _stone_stew_current_town_name();
     text += "\nObjective: ";
@@ -918,6 +1106,47 @@ static bool _stone_stew_townsperson_moral_quest(const monster& mon)
     }
 
     mpr("This town's matter has already found its ending.");
+    return true;
+}
+
+static bool _stone_stew_townsperson_moral_followup()
+{
+    if (_stone_stew_town_moral_state() != SSQ_COMPLETED
+        || !you.props.exists(_stone_stew_town_moral_key(
+            STONE_STEW_TOWN_MORAL_OUTCOME_KEY)))
+    {
+        return false;
+    }
+
+    const int choice = you.props[_stone_stew_town_moral_key(
+        STONE_STEW_TOWN_MORAL_OUTCOME_KEY)].get_int();
+    const stone_stew_npc_identity identity =
+        _stone_stew_current_moral_identity();
+
+    if (choice == 0)
+    {
+        mprf("\"Mercy has a long shadow,\" %s the %s says. "
+             "\"Some sleep warmer for it. Some do not sleep at all.\"",
+             identity.name.c_str(), identity.role.c_str());
+    }
+    else if (choice == 1)
+    {
+        mprf("\"Law is a cold blanket,\" %s the %s says. "
+             "\"Still, cold blankets keep some people alive.\"",
+             identity.name.c_str(), identity.role.c_str());
+    }
+    else if (choice == 2)
+    {
+        mprf("\"No one forgave you,\" %s the %s says. "
+             "\"That may be how I know you judged fairly.\"",
+             identity.name.c_str(), identity.role.c_str());
+    }
+    else
+    {
+        mprf("%s the %s watches the town with changed eyes.",
+             identity.name.c_str(), identity.role.c_str());
+    }
+
     return true;
 }
 
@@ -1624,15 +1853,26 @@ static bool _stone_stew_town_npc_talk(const monster& mon)
 
     if (mon.mname == "townsperson")
     {
+        if (_stone_stew_townsperson_moral_followup())
+            return true;
+
+        const stone_stew_npc_identity identity =
+            _stone_stew_current_moral_identity();
         if (you.where_are_you == BRANCH_DWARF
             || you.where_are_you == BRANCH_FOREST)
         {
-            mprf("The townsperson gives you a cautious nod. "
+            mprf("%s the %s gives you a cautious nod. "
                  "\"%s is safe ground, if you keep it that way.\"",
+                 identity.name.c_str(), identity.role.c_str(),
                  _stone_stew_current_town_name().c_str());
         }
         else
-            mpr("The townsperson gives you a cautious nod.");
+        {
+            mprf("%s the %s gives you a cautious nod. "
+                 "They seem %s, and %s.",
+                 identity.name.c_str(), identity.role.c_str(),
+                 identity.trait.c_str(), identity.pressure.c_str());
+        }
         return true;
     }
 
