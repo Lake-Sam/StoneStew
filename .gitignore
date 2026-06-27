@@ -7,5 +7,6 @@
 *.sublime-project
 games.d/
 dist/
+third_party/stone-stew-llm/
 crawl-ref/source/crawl.exe
 crawl-ref/source/build-stone-stew/

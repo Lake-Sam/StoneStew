@@ -8,6 +8,7 @@ $ErrorActionPreference = "Stop"
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $SourceDir = Join-Path $RepoRoot "crawl-ref/source"
 $Exe = Join-Path $SourceDir "crawl.exe"
+$BundledLlmSource = Join-Path $RepoRoot "third_party/stone-stew-llm"
 $DistRoot = Join-Path $RepoRoot "dist"
 $PackageName = "StoneStew-$Version-$Configuration"
 $PackageDir = Join-Path $DistRoot $PackageName
@@ -43,10 +44,65 @@ Copy-Item -LiteralPath (Join-Path $RepoRoot "LICENSE") -Destination $PackageDir
 Copy-Item -LiteralPath (Join-Path $RepoRoot "docs/stone-stew-design.md") -Destination $PackageDir
 Copy-Item -LiteralPath (Join-Path $RepoRoot "docs/testing-stone-stew.md") -Destination $PackageDir
 
+$HasBundledLlm = Test-Path (Join-Path $BundledLlmSource "llama/llama-server.exe")
+$HasBundledModel = Test-Path (Join-Path $BundledLlmSource "models/Qwen3-1.7B-Q4_K_M.gguf")
+if ($HasBundledLlm -and $HasBundledModel) {
+    $BundledLlmDest = Join-Path $PackageDir "llm"
+    New-Item -ItemType Directory -Force -Path $BundledLlmDest | Out-Null
+    Copy-Item -LiteralPath (Join-Path $BundledLlmSource "llama") -Destination $BundledLlmDest -Recurse
+    Copy-Item -LiteralPath (Join-Path $BundledLlmSource "models") -Destination $BundledLlmDest -Recurse
+    if (Test-Path (Join-Path $BundledLlmSource "README.txt")) {
+        Copy-Item -LiteralPath (Join-Path $BundledLlmSource "README.txt") -Destination $BundledLlmDest
+    }
+}
+
+@"
+param(
+    [int]`$Port = 8080
+)
+
+`$ErrorActionPreference = "SilentlyContinue"
+`$Root = Split-Path -Parent `$MyInvocation.MyCommand.Path
+`$Server = Join-Path `$Root "llm\llama\llama-server.exe"
+`$Model = Join-Path `$Root "llm\models\Qwen3-1.7B-Q4_K_M.gguf"
+
+if (!(Test-Path `$Server) -or !(Test-Path `$Model)) {
+    exit 0
+}
+
+`$AlreadyListening = Test-NetConnection -ComputerName 127.0.0.1 -Port `$Port -InformationLevel Quiet -WarningAction SilentlyContinue
+if (`$AlreadyListening) {
+    exit 0
+}
+
+`$Args = @(
+    "-m", "`$Model",
+    "--host", "127.0.0.1",
+    "--port", "`$Port",
+    "-c", "2048",
+    "-ngl", "0"
+)
+
+Start-Process -FilePath `$Server -ArgumentList `$Args -WorkingDirectory (Split-Path -Parent `$Server) -WindowStyle Hidden | Out-Null
+for (`$i = 0; `$i -lt 60; `$i++) {
+    try {
+        `$Health = Invoke-WebRequest -Uri "http://127.0.0.1:`$Port/health" -UseBasicParsing -TimeoutSec 1
+        if (`$Health.StatusCode -eq 200) {
+            exit 0
+        }
+    }
+    catch {
+    }
+    Start-Sleep -Seconds 1
+}
+"@ | Set-Content -LiteralPath (Join-Path $PackageDir "Start Stone Stew LLM.ps1") -Encoding ASCII
+
 @"
 @echo off
 cd /d "%~dp0"
 echo Starting Stone Stew from %CD%
+if exist "%~dp0llm\llama\llama-server.exe" echo Starting local dialogue model...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0Start Stone Stew LLM.ps1" >nul 2>nul
 crawl.exe %*
 if errorlevel 1 pause
 "@ | Set-Content -LiteralPath (Join-Path $PackageDir "Start Stone Stew.bat") -Encoding ASCII
@@ -59,6 +115,9 @@ Run:
 
 Saves are stored next to the installed game in:
   saves
+
+Bundled LLM:
+  $(if ($HasBundledLlm -and $HasBundledModel) { "Included. Start Stone Stew.bat starts llama.cpp locally on 127.0.0.1:8080." } else { "Not included in this package. Run tools/download-stone-stew-llm.ps1 before packaging to bundle it." })
 
 This is an early development build based on Dungeon Crawl Stone Soup 0.34.1.
 "@ | Set-Content -LiteralPath (Join-Path $PackageDir "RUN-ME.txt") -Encoding ASCII

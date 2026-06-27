@@ -739,6 +739,37 @@ static string _stone_stew_extract_json_response(const string& json)
     return trimmed_string(_stone_stew_json_unescape(response));
 }
 
+static string _stone_stew_extract_json_string_value(const string& json,
+                                                    const string& field)
+{
+    const string needle = "\"" + field + "\":\"";
+    string::size_type start = json.find(needle);
+    if (start == string::npos)
+        return "";
+
+    start += needle.size();
+    string response;
+    bool escaped = false;
+    for (string::size_type i = start; i < json.size(); ++i)
+    {
+        const char c = json[i];
+        if (escaped)
+        {
+            response += '\\';
+            response += c;
+            escaped = false;
+        }
+        else if (c == '\\')
+            escaped = true;
+        else if (c == '"')
+            break;
+        else
+            response += c;
+    }
+
+    return trimmed_string(_stone_stew_json_unescape(response));
+}
+
 static string _stone_stew_sanitise_llm_line(string line)
 {
     line = replace_all(line, "\n", " ");
@@ -750,29 +781,13 @@ static string _stone_stew_sanitise_llm_line(string line)
     return line;
 }
 
-static string _stone_stew_llm_flavour(const monster& mon, const string& topic)
+static string _stone_stew_run_llm_request(const string& url,
+                                          const string& body)
 {
-    const stone_stew_npc_identity identity =
-        _stone_stew_current_moral_identity();
-    const string npc_name = mon.mname == "townsperson"
-                            ? identity.name
-                            : mon.name(DESC_PLAIN);
-    const string prompt = make_stringf(
-        "Write one short in-character line for a Dungeon Crawl Stone Soup fork "
-        "NPC. NPC name: %s. Town: %s. Topic: %s. Allowed facts only: towns, "
-        "guilds, priests, quests, shops, training, gold, artefacts, Dungeon, "
-        "Lair, and the known DCSS gods. Do not invent mechanics. Keep under "
-        "24 words.",
-        npc_name.c_str(), _stone_stew_current_town_name().c_str(),
-        topic.c_str());
-
-    const string body = "{\"model\":\"qwen3:1.7b\",\"stream\":false,"
-                        "\"options\":{\"think\":false},\"prompt\":\""
-                        + _stone_stew_json_escape(prompt) + "\"}";
-    const string command = "curl --silent --max-time 3 "
+    const string command = "curl --silent --max-time 45 "
                            "-H \"Content-Type: application/json\" "
                            "-d \"" + _stone_stew_json_escape(body) + "\" "
-                           "http://127.0.0.1:11434/api/generate";
+                           + url;
 
 #ifdef WIN32
     FILE *pipe = _popen(command.c_str(), "r");
@@ -793,8 +808,41 @@ static string _stone_stew_llm_flavour(const monster& mon, const string& topic)
     pclose(pipe);
 #endif
 
-    return _stone_stew_sanitise_llm_line(
-        _stone_stew_extract_json_response(output));
+    return output;
+}
+
+static string _stone_stew_llm_flavour(const monster& mon, const string& topic)
+{
+    const stone_stew_npc_identity identity =
+        _stone_stew_current_moral_identity();
+    const string npc_name = mon.mname == "townsperson"
+                            ? identity.name
+                            : mon.name(DESC_PLAIN);
+    const string prompt = make_stringf(
+        "One in-character Stone Stew NPC line. NPC: %s. Town: %s. Topic: %s. "
+        "Use only known game facts. Under 18 words. No reasoning.",
+        npc_name.c_str(), _stone_stew_current_town_name().c_str(),
+        topic.c_str());
+
+    const string chat_body =
+        "{\"model\":\"stone-stew-qwen3-1.7b-q4\",\"stream\":false,"
+        "\"temperature\":0.85,\"max_tokens\":32,\"messages\":["
+        "{\"role\":\"system\",\"content\":\"You write short NPC flavor lines "
+        "for Stone Stew. Output only the spoken line.\"},"
+        "{\"role\":\"user\",\"content\":\"/no_think\\n"
+        + _stone_stew_json_escape(prompt) + "\"}]}";
+    string output = _stone_stew_run_llm_request(
+        "http://127.0.0.1:8080/v1/chat/completions", chat_body);
+    string line = _stone_stew_extract_json_string_value(output, "content");
+    if (!line.empty())
+        return _stone_stew_sanitise_llm_line(line);
+
+    const string ollama_body = "{\"model\":\"qwen3:1.7b\",\"stream\":false,"
+                               "\"options\":{\"think\":false},\"prompt\":\""
+                               + _stone_stew_json_escape(prompt) + "\"}";
+    output = _stone_stew_run_llm_request(
+        "http://127.0.0.1:11434/api/generate", ollama_body);
+    return _stone_stew_sanitise_llm_line(_stone_stew_extract_json_response(output));
 }
 
 static void _stone_stew_maybe_print_llm_flavour(const monster& mon,
@@ -806,7 +854,7 @@ static void _stone_stew_maybe_print_llm_flavour(const monster& mon,
     else if (!you.props.exists(STONE_STEW_LLM_NOTICE_KEY))
     {
         you.props[STONE_STEW_LLM_NOTICE_KEY] = true;
-        mpr("<darkgrey>Stone Stew LLM fallback: no localhost Ollama response.</darkgrey>");
+        mpr("<darkgrey>Stone Stew LLM fallback: no local model response.</darkgrey>");
     }
 }
 
