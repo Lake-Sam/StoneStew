@@ -8,6 +8,7 @@
 #include "stone-stew.h"
 
 #include "artefact.h"
+#include "branch.h"
 #include "invent.h"
 #include "items.h"
 #include "libutil.h"
@@ -33,6 +34,8 @@ static const char *STONE_STEW_BETHRA_SECOND_QUEST_KEY =
 static const char *STONE_STEW_RELLAN_FIGHTING_TRAINING_KEY =
     "stone_stew_rellan_fighting_training";
 static const char *STONE_STEW_TOWN_HOME_KEY = "stone_stew_town_home";
+static const char *STONE_STEW_MID_DUNGEON_TOWN_NAME_KEY =
+    "stone_stew_mid_dungeon_town_name";
 static const int STONE_STEW_RELLAN_FIGHTING_TRAINING_COST = 60;
 static const int STONE_STEW_RELLAN_FIGHTING_TRAINING_POINTS = 180;
 
@@ -182,6 +185,29 @@ static const stone_stew_quest_def STONE_STEW_QUESTS[] =
 static const int STONE_STEW_NUM_QUESTS =
     sizeof(STONE_STEW_QUESTS) / sizeof(STONE_STEW_QUESTS[0]);
 
+static string _stone_stew_mid_dungeon_town_name()
+{
+    if (!you.props.exists(STONE_STEW_MID_DUNGEON_TOWN_NAME_KEY))
+    {
+        static const char *prefixes[] =
+        {
+            "Moss", "Copper", "Ash", "Lantern", "Root", "Brine",
+            "Ember", "Stone", "Nerul's", "Grey"
+        };
+        static const char *suffixes[] =
+        {
+            "gate", "hall", "Rest", "Stair", "Market", "Well",
+            "Hearth", "Crossing", "Watch", "Haven"
+        };
+
+        you.props[STONE_STEW_MID_DUNGEON_TOWN_NAME_KEY] =
+            string(prefixes[random2(ARRAYSZ(prefixes))])
+            + suffixes[random2(ARRAYSZ(suffixes))];
+    }
+
+    return you.props[STONE_STEW_MID_DUNGEON_TOWN_NAME_KEY].get_string();
+}
+
 bool stone_stew_is_town_npc(const monster& mon)
 {
     return mon.wont_attack()
@@ -190,7 +216,11 @@ bool stone_stew_is_town_npc(const monster& mon)
                || mon.mname == "Bertha of the Cot"
                || mon.mname == "Bethra of the Cot"
                || mon.mname == "Gate Warden"
-               || mon.mname == "townsperson");
+               || mon.mname == "townsperson"
+               || mon.mname == "Town Priest"
+               || mon.mname == "Town Broker"
+               || mon.mname == "Guild Factor"
+               || mon.mname == "Lantern Warden");
 }
 
 static bool _stone_stew_mon_is_giver(const monster& mon,
@@ -415,9 +445,47 @@ static bool _stone_stew_town_npc_talk(const monster& mon)
         return true;
     }
 
+    if (mon.mname == "Town Priest")
+    {
+        mprf("\"%s keeps shrines for travelers who still have choices,\" "
+             "the priest says. \"Pray if the god's eye finds you.\"",
+             _stone_stew_mid_dungeon_town_name().c_str());
+        return true;
+    }
+
+    if (mon.mname == "Town Broker")
+    {
+        mprf("\"%s buys stories before it buys steel,\" the broker says. "
+             "\"Bring stranger goods when the roads below open wider.\"",
+             _stone_stew_mid_dungeon_town_name().c_str());
+        return true;
+    }
+
+    if (mon.mname == "Guild Factor")
+    {
+        mpr("\"Guild writs are sealed for now,\" the factor says. "
+            "\"Earn a name in the deep roads and doors will notice.\"");
+        return true;
+    }
+
+    if (mon.mname == "Lantern Warden")
+    {
+        mprf("\"Welcome to %s,\" the warden says. "
+             "\"No blades drawn inside the lamps.\"",
+             _stone_stew_mid_dungeon_town_name().c_str());
+        return true;
+    }
+
     if (mon.mname == "townsperson")
     {
-        mpr("The townsperson gives you a cautious nod.");
+        if (you.where_are_you == BRANCH_DWARF)
+        {
+            mprf("The townsperson gives you a cautious nod. "
+                 "\"%s is safe ground, if you keep it that way.\"",
+                 _stone_stew_mid_dungeon_town_name().c_str());
+        }
+        else
+            mpr("The townsperson gives you a cautious nod.");
         return true;
     }
 
@@ -823,6 +891,14 @@ static int _stone_stew_town_npc_roam_radius(const monster& mon)
 
     if (mon.mname == "townsperson")
         return 9;
+
+    if (mon.mname == "Town Priest"
+        || mon.mname == "Town Broker"
+        || mon.mname == "Guild Factor"
+        || mon.mname == "Lantern Warden")
+    {
+        return 4;
+    }
 
     return 7;
 }

@@ -53,14 +53,14 @@ const Branch branches[NUM_BRANCHES] =
       {BRANCH_SWAMP, BRANCH_SNAKE, BRANCH_SHOALS, BRANCH_SPIDER } },
 #if TAG_MAJOR_VERSION == 34
 
-    { BRANCH_DWARF, BRANCH_ELF, -1, -1, 0, 17,
-      brflag::none,
+    { BRANCH_DWARF, BRANCH_DUNGEON, 6, 10, 1, 8,
+      brflag::fully_map,
       DNGN_ENTER_DWARF, DNGN_EXIT_DWARF, NUM_FEATURES,
-      "Dwarven Hall", "the Dwarven Hall", "Dwarf",
-      nullptr,
+      "Dungeon Town", "a dungeon town", "Town",
+      "You step into a lantern-lit town carved into the dungeon's ribs.",
       BROWN, BROWN,
       'K', {}, branch_noise::normal, DEFAULT_MON_DIE_SIZE,
-      {}},
+      {BRANCH_DUNGEON}},
 #endif
 
     { BRANCH_LAIR, BRANCH_DUNGEON, 8, 11, 5, 10,

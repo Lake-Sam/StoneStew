@@ -1,0 +1,43 @@
+##############################################################################
+# Stone Stew mid-Dungeon town prototype.
+##############################################################################
+
+NAME:   stone_stew_mid_dungeon_town
+DEPTH:  Town
+TAGS:   no_monster_gen no_trap_gen no_rotate no_pool_fixup encompass
+KFEAT:  > = exit_dungeon_town
+KFEAT:  A = altar_okawaru / altar_elyvilon / altar_sif_muna / altar_gozag / altar_hepliaklqana / altar_ru
+KFEAT:  B = altar_trog / altar_fedhas / altar_nemelex_xobeh / altar_qazlal / altar_wu_jian / altar_uskayaw
+KFEAT:  S = general shop
+KFEAT:  F = fountain_blue
+KMONS:  W = human att:good_neutral name:Lantern_Warden name_replace ; spear . ring mail
+KMONS:  P = human att:good_neutral name:Town_Priest name_replace ; quarterstaff . robe
+KMONS:  C = human att:good_neutral name:Town_Broker name_replace ; dagger . robe
+KMONS:  G = human att:good_neutral name:Guild_Factor name_replace ; short sword . leather armour
+KMONS:  T = human att:good_neutral name:townsperson name_replace ; nothing
+TILE:   x = wall_stone_smooth
+FTILE:  .+ABFSCGPWT> = floor_pebble_brown
+FTILE:  v = floor_grass_dark
+MAP
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+x...........x.............x...............x
+x..W........+.....S.......+.......C.......x
+x...........x.............x...............x
+xxxxxx+xxxxxxxxxxx+xxxxxxxxxxxx+xxxxxxxxxxx
+x.........................................x
+x.....vvvvvvv...................vvvvvvv...x
+x.....v.....v.......F...........v.....v...x
+x.....v..A..v.......{...........v..B..v...x
+x.....v..P..v...................v..P..v...x
+x.....vvvvvvv...................vvvvvvv...x
+x.........................................x
+xxxxxx+xxxxxxxxxxx+xxxxxxxxxxxx+xxxxxxxxxxx
+x...........x.............x...............x
+x..G........+.....T.......+.......T.......x
+x...........x.............x...............x
+xxxxxxxxxxxxxxxxxxxxx+xxxxxxxxxxxxxxxxxxxxxx
+xxxxxxxxxxxxxxxxxx.......xxxxxxxxxxxxxxxxxx
+xxxxxxxxxxxxxxxxxx...>...xxxxxxxxxxxxxxxxxx
+xxxxxxxxxxxxxxxxxx.......xxxxxxxxxxxxxxxxxx
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+ENDMAP
