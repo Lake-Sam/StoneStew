@@ -14,9 +14,9 @@ TAGS:   arrival no_monster_gen no_trap_gen no_rotate transparent
 ORIENT: float
 WEIGHT: 10000
 KMONS:  G = vault guard att:good_neutral name:Gate_Warden name_replace ; demon blade | great sword . plate armour | chain mail
-KMONS:  M = human att:good_neutral name:Mara_the_Coinwise name_replace ; dagger . robe
-KMONS:  Q = human att:good_neutral name:Old_Rellan name_replace ; quarterstaff . robe
-KMONS:  B = human att:good_neutral name:Bertha_of_the_Cot name_replace ; club . robe
+KMONS:  M = human att:good_neutral name:Artefact_Broker name_replace ; dagger . robe
+KMONS:  Q = human att:good_neutral name:townsperson name_replace ; nothing
+KMONS:  B = human att:good_neutral name:townsperson name_replace ; nothing
 KMONS:  T = human att:good_neutral name:townsperson name_replace ; nothing
 KFEAT:  S = general shop
 KFEAT:  F = fountain_blue

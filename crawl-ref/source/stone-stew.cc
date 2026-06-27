@@ -28,16 +28,6 @@
 
 #include <cstdio>
 
-static const char *STONE_STEW_RELLAN_QUEST_KEY =
-    "stone_stew_rellan_first_depth_quest";
-static const char *STONE_STEW_RELLAN_SECOND_QUEST_KEY =
-    "stone_stew_rellan_second_depth_quest";
-static const char *STONE_STEW_BETHRA_QUEST_KEY =
-    "stone_stew_bethra_road_coin_quest";
-static const char *STONE_STEW_BETHRA_SECOND_QUEST_KEY =
-    "stone_stew_bethra_second_purse_quest";
-static const char *STONE_STEW_RELLAN_FIGHTING_TRAINING_KEY =
-    "stone_stew_rellan_fighting_training";
 static const char *STONE_STEW_TOWN_HOME_KEY = "stone_stew_town_home";
 static const char *STONE_STEW_MID_DUNGEON_TOWN_NAME_KEY =
     "stone_stew_mid_dungeon_town_name";
@@ -81,6 +71,10 @@ static const char *STONE_STEW_TOWN_MORAL_TARGET_XL_KEY =
     "stone_stew_town_moral_target_xl";
 static const char *STONE_STEW_TOWN_MORAL_OUTCOME_KEY =
     "stone_stew_town_moral_outcome";
+static const char *STONE_STEW_TOWN_MORAL_TRAINING_UNLOCK_KEY =
+    "stone_stew_town_moral_training_unlock";
+static const char *STONE_STEW_TOWN_MORAL_TRAINING_USED_KEY =
+    "stone_stew_town_moral_training_used";
 static const char *STONE_STEW_TOWN_MORAL_IDENTITY_NAME_KEY =
     "stone_stew_town_moral_identity_name";
 static const char *STONE_STEW_TOWN_MORAL_IDENTITY_ROLE_KEY =
@@ -91,10 +85,10 @@ static const char *STONE_STEW_TOWN_MORAL_IDENTITY_PRESSURE_KEY =
     "stone_stew_town_moral_identity_pressure";
 static const char *STONE_STEW_TOWN_MORAL_IDENTITY_VOICE_KEY =
     "stone_stew_town_moral_identity_voice";
+static const char *STONE_STEW_ARTEFACT_BROKER_NAME_KEY =
+    "stone_stew_artefact_broker_name";
 static const char *STONE_STEW_LLM_NOTICE_KEY =
     "stone_stew_llm_notice";
-static const int STONE_STEW_RELLAN_FIGHTING_TRAINING_COST = 60;
-static const int STONE_STEW_RELLAN_FIGHTING_TRAINING_POINTS = 180;
 static const int STONE_STEW_GUILD_BENEFIT_SKILL_POINTS = 220;
 
 enum stone_stew_quest_state
@@ -170,6 +164,7 @@ struct stone_stew_moral_choice
     string label;
     string player_line;
     string result;
+    string unlock_training;
     int reward_mod = 0;
 };
 
@@ -182,6 +177,7 @@ struct stone_stew_moral_template
     string offer;
     string objective;
     string reward;
+    string reward_family = "gold";
     string risk;
     string failure;
     string accepted;
@@ -202,26 +198,6 @@ struct stone_stew_npc_identity
 };
 
 static string _stone_stew_current_town_name();
-
-static bool _stone_stew_rellan_complete()
-{
-    return you.experience_level >= 2;
-}
-
-static bool _stone_stew_rellan_second_complete()
-{
-    return you.experience_level >= 3;
-}
-
-static bool _stone_stew_bethra_complete()
-{
-    return you.gold >= 40;
-}
-
-static bool _stone_stew_bethra_second_complete()
-{
-    return you.gold >= 75;
-}
 
 static const stone_stew_training_def STONE_STEW_TRAINING[] =
 {
@@ -286,100 +262,8 @@ static const stone_stew_training_def STONE_STEW_TRAINING[] =
 static const int STONE_STEW_NUM_TRAINING =
     static_cast<int>(ARRAYSZ(STONE_STEW_TRAINING));
 
-static const stone_stew_quest_def STONE_STEW_QUESTS[] =
-{
-    {
-        STONE_STEW_RELLAN_QUEST_KEY,
-        nullptr,
-        SSQ_UNOFFERED,
-        "Old Rellan",
-        nullptr,
-        "First Depths",
-        "\"Step past the gate and survive long enough to learn something,\" "
-        "Old Rellan says.",
-        "Reach experience level 2, then return to Old Rellan.",
-        "25 gold pieces.",
-        "Low. You only need to survive ordinary D:1 exploration.",
-        "None yet, but later quest types may fail.",
-        "Quest accepted: reach experience level 2, then return to Old Rellan.",
-        "\"Not yet,\" Old Rellan says. \"Come back once you reach experience level 2.\"",
-        "\"There. Now you have heard the dungeon answer back,\" Old Rellan says.",
-        "\"No more errands today,\" Old Rellan says. \"Spend that coin before it spends you.\"",
-        "\"Too late for that lesson now,\" Old Rellan says.",
-        25,
-        _stone_stew_rellan_complete,
-        nullptr,
-    },
-    {
-        STONE_STEW_RELLAN_SECOND_QUEST_KEY,
-        STONE_STEW_RELLAN_QUEST_KEY,
-        SSQ_COMPLETED,
-        "Old Rellan",
-        nullptr,
-        "Second Footing",
-        "\"The dungeon has noticed you now,\" Old Rellan says. "
-        "\"Learn whether your feet still obey when it pushes back.\"",
-        "Reach experience level 3, then return to Old Rellan.",
-        "40 gold pieces.",
-        "Low to moderate. You may need to explore beyond the safest rooms.",
-        "None yet, but later quest types may fail.",
-        "Quest accepted: reach experience level 3, then return to Old Rellan.",
-        "\"Still too green,\" Old Rellan says. \"Come back once you reach experience level 3.\"",
-        "\"Good. Fear is quieter when it has a name,\" Old Rellan says.",
-        "\"I have taught you what I can from this gate,\" Old Rellan says.",
-        "\"That lesson has passed you by,\" Old Rellan says.",
-        40,
-        _stone_stew_rellan_second_complete,
-        nullptr,
-    },
-    {
-        STONE_STEW_BETHRA_QUEST_KEY,
-        nullptr,
-        SSQ_UNOFFERED,
-        "Bertha of the Cot",
-        "Bethra of the Cot",
-        "Road Coin",
-        "\"A town does not run on warnings alone,\" Bertha says. "
-        "\"Show me you can make the dungeon pay for your boots.\"",
-        "Return to Bertha once you have at least 40 gold pieces.",
-        "15 gold pieces.",
-        "Low. Explore D:1, gather loose gold, and return when your purse is heavy enough.",
-        "None yet, but later quest types may fail.",
-        "Quest accepted: gather at least 40 gold pieces, then return to Bertha.",
-        "\"Not enough coin-song yet,\" Bertha says. \"Come back with at least 40 gold pieces.\"",
-        "\"There, you have learned the sound of survival,\" Bertha says.",
-        "\"No more errands from the inn today,\" Bertha says.",
-        "\"That road has gone cold,\" Bertha says.",
-        15,
-        _stone_stew_bethra_complete,
-        nullptr,
-    },
-    {
-        STONE_STEW_BETHRA_SECOND_QUEST_KEY,
-        STONE_STEW_BETHRA_QUEST_KEY,
-        SSQ_COMPLETED,
-        "Bertha of the Cot",
-        "Bethra of the Cot",
-        "Heavy Purse",
-        "\"Coin is not safety,\" Bertha says, \"but it buys blankets, boots, "
-        "and the sort of soup that remembers you.\"",
-        "Return to Bertha once you have at least 75 gold pieces.",
-        "35 gold pieces.",
-        "Low. This rewards steady early exploration and restraint.",
-        "None yet, but later quest types may fail.",
-        "Quest accepted: gather at least 75 gold pieces, then return to Bertha.",
-        "\"That purse still whispers,\" Bertha says. \"Bring me at least 75 gold pieces.\"",
-        "\"There it is. A purse with a spine,\" Bertha says.",
-        "\"No more purse-work today,\" Bertha says. \"Go spend wisely.\"",
-        "\"That purse-work is past saving,\" Bertha says.",
-        35,
-        _stone_stew_bethra_second_complete,
-        nullptr,
-    },
-};
-
-static const int STONE_STEW_NUM_QUESTS =
-    sizeof(STONE_STEW_QUESTS) / sizeof(STONE_STEW_QUESTS[0]);
+static const stone_stew_quest_def *STONE_STEW_QUESTS = nullptr;
+static const int STONE_STEW_NUM_QUESTS = 0;
 
 static string _stone_stew_town_moral_key(const char *base)
 {
@@ -476,6 +360,17 @@ static stone_stew_npc_identity _stone_stew_current_moral_identity()
     return identity;
 }
 
+static string _stone_stew_artefact_broker_name()
+{
+    static const char *names[] =
+    {
+        "Vessa", "Marn", "Orric", "Sable", "Tovin", "Kessa", "Brindle"
+    };
+
+    return _stone_stew_pick_identity_field(STONE_STEW_ARTEFACT_BROKER_NAME_KEY,
+                                          names, ARRAYSZ(names));
+}
+
 static string _stone_stew_substitute(string text)
 {
     const stone_stew_npc_identity identity =
@@ -540,6 +435,8 @@ static void _stone_stew_set_template_field(stone_stew_moral_template& tmpl,
         tmpl.objective = value;
     else if (key == "reward")
         tmpl.reward = value;
+    else if (key == "reward_family")
+        tmpl.reward_family = value.empty() ? "gold" : value;
     else if (key == "risk")
         tmpl.risk = value;
     else if (key == "failure")
@@ -567,6 +464,8 @@ static void _stone_stew_set_template_field(stone_stew_moral_template& tmpl,
             tmpl.choices[choice].player_line = value;
         else if (suffix == "result")
             tmpl.choices[choice].result = value;
+        else if (suffix == "unlock_training")
+            tmpl.choices[choice].unlock_training = value;
         else if (suffix == "reward_mod")
             tmpl.choices[choice].reward_mod = atoi(value.c_str());
     }
@@ -653,6 +552,7 @@ static const stone_stew_moral_template *_stone_stew_current_moral_template()
                              "to judge the cache.";
         fallback.reward = "Scaled gold based on your level and chosen "
                           "resolution.";
+        fallback.reward_family = "gold";
         fallback.risk = "Moderate. This asks you to survive more of the local "
                         "branch.";
         fallback.failure = "If the giver dies, the town problem dies with "
@@ -758,6 +658,36 @@ static int _stone_stew_town_moral_reward(
                          ? tmpl.choices[choice].reward_mod
                          : 0;
     return max(0, tmpl.base_gold + target_xl * tmpl.gold_per_xl + modifier);
+}
+
+static bool _stone_stew_skill_from_name(const string& name, skill_type& skill)
+{
+    const string lower = lowercase_string(name);
+    if (lower == "fighting")
+        skill = SK_FIGHTING;
+    else if (lower == "armour" || lower == "armor")
+        skill = SK_ARMOUR;
+    else if (lower == "dodging")
+        skill = SK_DODGING;
+    else if (lower == "stealth")
+        skill = SK_STEALTH;
+    else
+        return false;
+
+    return true;
+}
+
+static bool _stone_stew_town_moral_training_unlocked(skill_type& skill)
+{
+    const string unlock_key =
+        _stone_stew_town_moral_key(STONE_STEW_TOWN_MORAL_TRAINING_UNLOCK_KEY);
+    const string used_key =
+        _stone_stew_town_moral_key(STONE_STEW_TOWN_MORAL_TRAINING_USED_KEY);
+    if (!you.props.exists(unlock_key) || you.props.exists(used_key))
+        return false;
+
+    return _stone_stew_skill_from_name(you.props[unlock_key].get_string(),
+                                      skill);
 }
 
 static string _stone_stew_json_escape(const string& text)
@@ -940,6 +870,8 @@ static string _stone_stew_moral_offer_text(
                         "{target_xl}", make_stringf("%d", target_xl));
     text += "\nReward: ";
     text += _stone_stew_substitute(tmpl.reward);
+    text += "\nReward family: ";
+    text += tmpl.reward_family;
     text += "\nRisk: ";
     text += _stone_stew_substitute(tmpl.risk);
     text += "\nFailure: ";
@@ -1030,6 +962,8 @@ static string _stone_stew_moral_log_entry(
                         "{target_xl}", make_stringf("%d", target_xl));
     text += "\nReward: ";
     text += _stone_stew_substitute(tmpl.reward);
+    text += "\nReward family: ";
+    text += tmpl.reward_family;
     text += "\nRisk: ";
     text += _stone_stew_substitute(tmpl.risk);
     text += "\nStatus: ";
@@ -1096,6 +1030,15 @@ static bool _stone_stew_townsperson_moral_quest(const monster& mon)
         }
         you.props[_stone_stew_town_moral_key(STONE_STEW_TOWN_MORAL_OUTCOME_KEY)]
             = choice;
+        if (!tmpl->choices[choice].unlock_training.empty())
+        {
+            you.props[_stone_stew_town_moral_key(
+                STONE_STEW_TOWN_MORAL_TRAINING_UNLOCK_KEY)] =
+                tmpl->choices[choice].unlock_training;
+            mprf("%s is now willing to arrange %s training.",
+                 _stone_stew_current_moral_identity().name.c_str(),
+                 tmpl->choices[choice].unlock_training.c_str());
+        }
         _stone_stew_set_town_moral_state(SSQ_COMPLETED);
         take_note(Note(NOTE_USER_NOTE, 0, 0, "",
                        make_stringf("Resolved %s in %s.",
@@ -1506,10 +1449,7 @@ static string _stone_stew_survey_log_entry(
 bool stone_stew_is_town_npc(const monster& mon)
 {
     return mon.wont_attack()
-           && (mon.mname == "Mara the Coinwise"
-               || mon.mname == "Old Rellan"
-               || mon.mname == "Bertha of the Cot"
-               || mon.mname == "Bethra of the Cot"
+           && (mon.mname == "Artefact Broker"
                || mon.mname == "Gate Warden"
                || mon.mname == "townsperson"
                || mon.mname == "Town Priest"
@@ -1555,15 +1495,6 @@ static bool _stone_stew_quest_prereq_met(const stone_stew_quest_def& quest)
 static bool _stone_stew_quest_failed(const stone_stew_quest_def& quest)
 {
     return quest.fail && quest.fail();
-}
-
-static int _stone_stew_quest_state_by_key(const char *key)
-{
-    for (int i = 0; i < STONE_STEW_NUM_QUESTS; ++i)
-        if (STONE_STEW_QUESTS[i].prop_key == key)
-            return _stone_stew_quest_state(STONE_STEW_QUESTS[i]);
-
-    return SSQ_UNOFFERED;
 }
 
 static string _stone_stew_quest_offer_text(const stone_stew_quest_def& quest)
@@ -1766,24 +1697,11 @@ enum stone_stew_dialogue_action
 
 static bool _stone_stew_town_npc_talk(const monster& mon)
 {
-    if (mon.mname == "Mara the Coinwise")
+    if (mon.mname == "Artefact Broker")
     {
-        mpr("\"Coin spends better than blood,\" Mara says. "
-            "\"Bring me a strange artefact later and I will make a fair offer.\"");
-        return true;
-    }
-
-    if (mon.mname == "Old Rellan")
-    {
-        mpr("\"The first stairs are never the first danger,\" Old Rellan says. "
-            "\"Come back when you have earned a scar or two.\"");
-        return true;
-    }
-
-    if (mon.mname == "Bertha of the Cot" || mon.mname == "Bethra of the Cot")
-    {
-        mpr("\"Beds are for stories, not statistics,\" Bertha says. "
-            "\"Rest easy here; the town keeps its own watch.\"");
+        mprf("\"Coin spends better than blood,\" %s the artefact broker says. "
+             "\"Bring me a strange artefact later and I will make a fair offer.\"",
+             _stone_stew_artefact_broker_name().c_str());
         return true;
     }
 
@@ -1975,7 +1893,7 @@ static bool _stone_stew_town_npc_has_quest(const monster& mon)
     return false;
 }
 
-static bool _stone_stew_mara_will_buy(const item_def& item)
+static bool _stone_stew_broker_will_buy(const item_def& item)
 {
     return item.defined()
            && is_artefact(item)
@@ -1984,10 +1902,10 @@ static bool _stone_stew_mara_will_buy(const item_def& item)
            && !item_is_equipped(item);
 }
 
-static bool _stone_stew_has_mara_sale_item()
+static bool _stone_stew_has_broker_sale_item()
 {
     for (int i = 0; i < ENDOFPACK; ++i)
-        if (_stone_stew_mara_will_buy(you.inv[i]))
+        if (_stone_stew_broker_will_buy(you.inv[i]))
             return true;
 
     return false;
@@ -2001,12 +1919,13 @@ static int _stone_stew_randart_sale_price(const item_def& item)
     return max(1, min(350, shop_value / 5 + art_value));
 }
 
-static bool _stone_stew_mara_buy_randart()
+static bool _stone_stew_broker_buy_randart()
 {
-    if (!_stone_stew_has_mara_sale_item())
+    if (!_stone_stew_has_broker_sale_item())
     {
-        mpr("\"I buy identified strange artefacts,\" Mara says. "
-            "\"Not heirlooms, not mysteries, and not what you are wearing.\"");
+        mprf("\"I buy identified strange artefacts,\" %s says. "
+             "\"Not heirlooms, not mysteries, and not what you are wearing.\"",
+             _stone_stew_artefact_broker_name().c_str());
         return true;
     }
 
@@ -2018,36 +1937,45 @@ static bool _stone_stew_mara_buy_randart()
         return true;
 
     item_def& item = you.inv[slot];
-    if (!_stone_stew_mara_will_buy(item))
+    if (!_stone_stew_broker_will_buy(item))
     {
         if (!item.defined())
-            mpr("\"Empty hands sell poorly,\" Mara says.");
+            mprf("\"Empty hands sell poorly,\" %s says.",
+                 _stone_stew_artefact_broker_name().c_str());
         else if (!is_artefact(item))
-            mpr("\"That is no artefact,\" Mara says.");
+            mprf("\"That is no artefact,\" %s says.",
+                 _stone_stew_artefact_broker_name().c_str());
         else if (is_unrandom_artefact(item))
-            mpr("\"Some things are too singular to fence,\" Mara says.");
+            mprf("\"Some things are too singular to fence,\" %s says.",
+                 _stone_stew_artefact_broker_name().c_str());
         else if (!item.is_identified())
-            mpr("\"Bring me a known thing, not a riddle,\" Mara says.");
+            mprf("\"Bring me a known thing, not a riddle,\" %s says.",
+                 _stone_stew_artefact_broker_name().c_str());
         else if (item_is_equipped(item))
-            mpr("\"Take it off first. I do not buy from someone's body,\" Mara says.");
+            mprf("\"Take it off first. I do not buy from someone's body,\" %s says.",
+                 _stone_stew_artefact_broker_name().c_str());
         else
-            mpr("\"Not that one,\" Mara says.");
+            mprf("\"Not that one,\" %s says.",
+                 _stone_stew_artefact_broker_name().c_str());
 
         return true;
     }
 
     const int payout = _stone_stew_randart_sale_price(item);
     const string item_name = item.name(DESC_YOUR);
-    const string prompt = make_stringf("Sell %s to Mara for %d gold?",
-                                       item_name.c_str(), payout);
+    const string broker = _stone_stew_artefact_broker_name();
+    const string prompt = make_stringf("Sell %s to %s for %d gold?",
+                                       item_name.c_str(), broker.c_str(),
+                                       payout);
 
     if (!yesno(prompt.c_str(), true, 'n'))
     {
-        mpr("\"Keep it, then,\" Mara says. \"The dungeon may yet change its mind.\"");
+        mprf("\"Keep it, then,\" %s says. \"The dungeon may yet change its mind.\"",
+             broker.c_str());
         return true;
     }
 
-    mprf("Mara buys %s for %d gold.", item_name.c_str(), payout);
+    mprf("%s buys %s for %d gold.", broker.c_str(), item_name.c_str(), payout);
     you.add_gold(payout);
     dec_inv_item_quantity(slot, 1);
     return true;
@@ -2055,16 +1983,7 @@ static bool _stone_stew_mara_buy_randart()
 
 static bool _stone_stew_town_npc_has_trade(const monster& mon)
 {
-    return mon.mname == "Mara the Coinwise";
-}
-
-static bool _stone_stew_rellan_training_available(const monster& mon)
-{
-    return mon.mname == "Old Rellan"
-           && _stone_stew_quest_state_by_key(STONE_STEW_RELLAN_QUEST_KEY)
-              >= SSQ_COMPLETED
-           && !you.props.exists(STONE_STEW_RELLAN_FIGHTING_TRAINING_KEY)
-           && you.skills[SK_FIGHTING] < 5;
+    return mon.mname == "Artefact Broker";
 }
 
 static const stone_stew_training_def *_stone_stew_paid_training_for(
@@ -2086,7 +2005,9 @@ static const stone_stew_training_def *_stone_stew_paid_training_for(
 
 static bool _stone_stew_town_npc_has_training(const monster& mon)
 {
-    return _stone_stew_rellan_training_available(mon)
+    skill_type skill;
+    return mon.mname == "townsperson"
+              && _stone_stew_town_moral_training_unlocked(skill)
            || _stone_stew_paid_training_for(mon);
 }
 
@@ -2105,10 +2026,11 @@ static bool _stone_stew_town_npc_has_guild_work(const monster& mon)
 
 static bool _stone_stew_town_npc_trade(const monster& mon)
 {
-    if (mon.mname == "Mara the Coinwise")
+    if (mon.mname == "Artefact Broker")
     {
-        mpr("Mara appraises your pack with professional interest.");
-        return _stone_stew_mara_buy_randart();
+        mprf("%s the artefact broker appraises your pack with professional interest.",
+             _stone_stew_artefact_broker_name().c_str());
+        return _stone_stew_broker_buy_randart();
     }
 
     mpr("They are not trading right now.");
@@ -2117,34 +2039,43 @@ static bool _stone_stew_town_npc_trade(const monster& mon)
 
 static bool _stone_stew_town_npc_training(const monster& mon)
 {
-    if (_stone_stew_rellan_training_available(mon))
+    skill_type unlocked_skill;
+    if (mon.mname == "townsperson"
+        && _stone_stew_town_moral_training_unlocked(unlocked_skill))
     {
-        const string prompt = make_stringf(
-            "Pay Old Rellan %d gold for a Fighting drill?",
-            STONE_STEW_RELLAN_FIGHTING_TRAINING_COST);
+        const stone_stew_npc_identity identity =
+            _stone_stew_current_moral_identity();
+        const string skill_name = _stone_stew_skill_name(unlocked_skill);
+        const int cost = 90 + you.experience_level * 10;
+        const int points = 160 + you.experience_level * 10;
 
-        if (you.gold < STONE_STEW_RELLAN_FIGHTING_TRAINING_COST)
+        mprf("\"I know who can teach %s,\" %s says. "
+             "\"Not for free, and not twice.\"",
+             skill_name.c_str(), identity.name.c_str());
+
+        if (you.gold < cost)
         {
-            mprf("\"Training costs %d gold,\" Old Rellan says. "
-                 "\"Come back with coin enough to respect the lesson.\"",
-                 STONE_STEW_RELLAN_FIGHTING_TRAINING_COST);
+            mprf("The arranged %s training costs %d gold.",
+                 skill_name.c_str(), cost);
             return true;
         }
 
+        const string prompt = make_stringf(
+            "Pay %s %d gold for arranged %s training?",
+            identity.name.c_str(), cost, skill_name.c_str());
         if (!yesno(prompt.c_str(), true, 'n'))
         {
-            mpr("\"Another time, then,\" Old Rellan says.");
+            mpr("\"Then the favor waits,\" they say.");
             return true;
         }
 
-        you.del_gold(STONE_STEW_RELLAN_FIGHTING_TRAINING_COST);
-        change_skill_points(SK_FIGHTING,
-                            STONE_STEW_RELLAN_FIGHTING_TRAINING_POINTS,
-                            true);
-        you.skills_to_show.insert(SK_FIGHTING);
-        you.props[STONE_STEW_RELLAN_FIGHTING_TRAINING_KEY] = 1;
-        mpr("\"Good,\" Old Rellan says. \"Keep your shoulders under your fear.\"");
-        mpr("Your Fighting skill improves from Old Rellan's drill.");
+        you.del_gold(cost);
+        change_skill_points(unlocked_skill, points, true);
+        you.skills_to_show.insert(unlocked_skill);
+        you.props[_stone_stew_town_moral_key(
+            STONE_STEW_TOWN_MORAL_TRAINING_USED_KEY)] = true;
+        mprf("Your %s skill improves from the arranged lesson.",
+             skill_name.c_str());
         return true;
     }
 
@@ -2544,9 +2475,6 @@ static int _stone_stew_town_npc_roam_radius(const monster& mon)
 {
     if (mon.mname == "Gate Warden")
         return 5;
-
-    if (mon.mname == "Bertha of the Cot" || mon.mname == "Bethra of the Cot")
-        return 3;
 
     if (mon.mname == "townsperson")
         return 9;
