@@ -4,7 +4,8 @@
 
 NAME:   stone_stew_mid_dungeon_town
 DEPTH:  Town
-TAGS:   no_monster_gen no_trap_gen no_rotate no_pool_fixup encompass
+TAGS:   no_monster_gen no_trap_gen no_rotate no_pool_fixup
+ORIENT: encompass
 KFEAT:  > = exit_dungeon_town
 KFEAT:  A = altar_okawaru / altar_elyvilon / altar_sif_muna / altar_gozag / altar_hepliaklqana / altar_ru
 KFEAT:  B = altar_trog / altar_fedhas / altar_nemelex_xobeh / altar_qazlal / altar_wu_jian / altar_uskayaw

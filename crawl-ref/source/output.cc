@@ -47,6 +47,7 @@
 #include "skills.h"
 #include "state.h"
 #include "status.h"
+#include "stone-stew.h"
 #include "stringutil.h"
 #include "tag-version.h"
 #include "throw.h"
@@ -68,7 +69,10 @@ static bool _is_using_small_layout()
 static string _level_description_string_hud()
 {
     const PlaceInfo& place = you.get_place_info();
-    string short_name = branches[place.branch].shortname;
+    string short_name = place.branch == BRANCH_DWARF
+                        || place.branch == BRANCH_FOREST
+                        ? stone_stew_branch_name(place.branch, false)
+                        : branches[place.branch].shortname;
 
     if (brdepth[place.branch] > 1)
         short_name += make_stringf(":%d", you.depth);

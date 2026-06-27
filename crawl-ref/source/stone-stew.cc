@@ -379,6 +379,17 @@ static string _stone_stew_current_town_name()
     return _stone_stew_mid_dungeon_town_name();
 }
 
+std::string stone_stew_branch_name(branch_type branch, bool long_name)
+{
+    if (branch == BRANCH_DWARF)
+        return _stone_stew_mid_dungeon_town_name();
+
+    if (branch == BRANCH_FOREST)
+        return _stone_stew_lair_town_name();
+
+    return long_name ? branches[branch].longname : branches[branch].abbrevname;
+}
+
 static int _stone_stew_persistent_index(const char *prop_key, int count)
 {
     if (!you.props.exists(prop_key))

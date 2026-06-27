@@ -4,7 +4,8 @@
 
 NAME:   stone_stew_lair_town
 DEPTH:  LairTown
-TAGS:   no_monster_gen no_trap_gen no_rotate no_pool_fixup encompass
+TAGS:   no_monster_gen no_trap_gen no_rotate no_pool_fixup
+ORIENT: encompass
 KFEAT:  > = exit_lair_town
 KFEAT:  A = altar_fedhas / altar_elyvilon / altar_cheibriados / altar_hepliaklqana / altar_ru / altar_wu_jian
 KFEAT:  B = altar_okawaru / altar_trog / altar_gozag / altar_nemelex_xobeh / altar_qazlal / altar_uskayaw

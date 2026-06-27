@@ -49,6 +49,7 @@
 #include "spl-damage.h"
 #include "spl-other.h"
 #include "state.h"
+#include "stone-stew.h"
 #include "stringutil.h"
 #include "tag-version.h"
 #include "terrain.h"
@@ -995,13 +996,15 @@ void floor_transition(dungeon_feature_type how,
     {
         const branch_type branch = you.where_are_you;
         if (branch_entered(branch))
-            mprf("Welcome back to %s!", branches[branch].longname);
+            mprf("Welcome back to %s!",
+                 stone_stew_branch_name(branch, true).c_str());
         else if (how == branches[branch].entry_stairs)
         {
             if (branches[branch].entry_message)
                 mpr(branches[branch].entry_message);
             else if (branch != BRANCH_ABYSS) // too many messages...
-                mprf("Welcome to %s!", branches[branch].longname);
+                mprf("Welcome to %s!",
+                     stone_stew_branch_name(branch, true).c_str());
         }
         const bool was_bezotted = bezotted_in(old_level.branch);
         if (bezotted())
@@ -1050,7 +1053,8 @@ void floor_transition(dungeon_feature_type how,
         if (boring_branch_exits.count(old_level.branch) == 0
             && !you.branches_left[old_level.branch])
         {
-            string old_branch_string = branches[old_level.branch].longname;
+            string old_branch_string =
+                stone_stew_branch_name(old_level.branch, true);
             if (starts_with(old_branch_string, "The "))
                 old_branch_string[0] = tolower_safe(old_branch_string[0]);
             mark_milestone("br.exit", "left " + old_branch_string + ".",
