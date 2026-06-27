@@ -46,6 +46,10 @@ static const char *STONE_STEW_DUNGEON_TOWN_GUILD_JOINED_KEY =
     "stone_stew_dungeon_town_guild_joined";
 static const char *STONE_STEW_LAIR_TOWN_GUILD_JOINED_KEY =
     "stone_stew_lair_town_guild_joined";
+static const char *STONE_STEW_DUNGEON_TOWN_SURVEY_KEY =
+    "stone_stew_dungeon_town_survey";
+static const char *STONE_STEW_LAIR_TOWN_SURVEY_KEY =
+    "stone_stew_lair_town_survey";
 static const int STONE_STEW_RELLAN_FIGHTING_TRAINING_COST = 60;
 static const int STONE_STEW_RELLAN_FIGHTING_TRAINING_POINTS = 180;
 
@@ -86,6 +90,20 @@ struct stone_stew_guild_def
     const char *focus;
     const char *theme;
     const char *join_pitch;
+};
+
+struct stone_stew_guild_survey_def
+{
+    const char *prop_key;
+    branch_type target_branch;
+    int target_depth;
+    const char *title;
+    const char *offer;
+    const char *accepted;
+    const char *incomplete;
+    const char *ready;
+    const char *completed;
+    int reward_gold;
 };
 
 static bool _stone_stew_rellan_complete()
@@ -360,6 +378,109 @@ static bool _stone_stew_current_guild_joined()
     return key && you.props.exists(key) && you.props[key].get_bool();
 }
 
+static const stone_stew_guild_survey_def *_stone_stew_current_survey()
+{
+    static const stone_stew_guild_survey_def dungeon_survey =
+    {
+        STONE_STEW_DUNGEON_TOWN_SURVEY_KEY,
+        BRANCH_DUNGEON,
+        11,
+        "Guild Survey: Lower Road",
+        "\"The board needs a reliable mark below the town road,\" the factor says. "
+        "\"Reach D:11, come back alive, and we will call that useful ink.\"",
+        "Guild work accepted: reach D:11, then return to the Guild Factor.",
+        "\"The lower mark is still blank,\" the factor says. \"Reach D:11, then return.\"",
+        "\"There. The lower road has your bootprint on it,\" the factor says.",
+        "\"No more survey writs are posted here today,\" the factor says.",
+        55,
+    };
+    static const stone_stew_guild_survey_def lair_survey =
+    {
+        STONE_STEW_LAIR_TOWN_SURVEY_KEY,
+        BRANCH_LAIR,
+        4,
+        "Guild Survey: Deep Paths",
+        "\"We need fresh signs from the deeper paths,\" the factor says. "
+        "\"Reach Lair:4, return with your skin attached, and the hall pays.\"",
+        "Guild work accepted: reach Lair:4, then return to the Guild Factor.",
+        "\"The deep paths still want your witness,\" the factor says. \"Reach Lair:4, then return.\"",
+        "\"Good. The Lair below has been seen and named,\" the factor says.",
+        "\"The lodge has no more survey writs for you today,\" the factor says.",
+        75,
+    };
+
+    if (you.where_are_you == BRANCH_DWARF)
+        return &dungeon_survey;
+
+    if (you.where_are_you == BRANCH_FOREST)
+        return &lair_survey;
+
+    return nullptr;
+}
+
+static int _stone_stew_survey_state(const stone_stew_guild_survey_def& survey)
+{
+    if (!you.props.exists(survey.prop_key))
+        return SSQ_UNOFFERED;
+
+    return you.props[survey.prop_key].get_int();
+}
+
+static void _stone_stew_set_survey_state(
+    const stone_stew_guild_survey_def& survey, int state)
+{
+    you.props[survey.prop_key] = state;
+}
+
+static bool _stone_stew_survey_complete(
+    const stone_stew_guild_survey_def& survey)
+{
+    const level_id target(survey.target_branch, survey.target_depth);
+    return level_id::current() == target || you.level_visited(target);
+}
+
+static string _stone_stew_survey_target_name(
+    const stone_stew_guild_survey_def& survey)
+{
+    return string(branches[survey.target_branch].abbrevname) + ":"
+           + make_stringf("%d", survey.target_depth);
+}
+
+static string _stone_stew_survey_log_entry(
+    const stone_stew_guild_survey_def& survey)
+{
+    const int state = _stone_stew_survey_state(survey);
+    if (state == SSQ_UNOFFERED)
+        return "";
+
+    const stone_stew_guild_def *guild = _stone_stew_current_guild();
+    string text = "<yellow>";
+    text += survey.title;
+    text += "</yellow>\n";
+    text += "Giver: ";
+    text += guild ? guild->name : "Local guild";
+    text += "\nObjective: Reach ";
+    text += _stone_stew_survey_target_name(survey);
+    text += ", then return to the Guild Factor.";
+    text += "\nReward: ";
+    text += make_stringf("%d gold pieces.", survey.reward_gold);
+    text += "\nRisk: Moderate. This requires real exploration beyond town.";
+    text += "\nFailure: None yet, but later guild contracts may fail.";
+    text += "\nStatus: ";
+
+    if (state == SSQ_ACTIVE)
+        text += _stone_stew_survey_complete(survey) ? "ready to turn in." : "active.";
+    else if (state == SSQ_COMPLETED)
+        text += "completed.";
+    else if (state == SSQ_FAILED)
+        text += "failed.";
+    else
+        text += "not accepted.";
+
+    text += "\n\n";
+    return text;
+}
+
 bool stone_stew_is_town_npc(const monster& mon)
 {
     return mon.wont_attack()
@@ -494,6 +615,44 @@ static string _stone_stew_quest_log_text()
         found = true;
     }
 
+    static const stone_stew_guild_survey_def survey_defs[] =
+    {
+        {
+            STONE_STEW_DUNGEON_TOWN_SURVEY_KEY,
+            BRANCH_DUNGEON,
+            11,
+            "Guild Survey: Lower Road",
+            nullptr,
+            nullptr,
+            nullptr,
+            nullptr,
+            nullptr,
+            55,
+        },
+        {
+            STONE_STEW_LAIR_TOWN_SURVEY_KEY,
+            BRANCH_LAIR,
+            4,
+            "Guild Survey: Deep Paths",
+            nullptr,
+            nullptr,
+            nullptr,
+            nullptr,
+            nullptr,
+            75,
+        },
+    };
+
+    for (int i = 0; i < static_cast<int>(ARRAYSZ(survey_defs)); ++i)
+    {
+        const string entry = _stone_stew_survey_log_entry(survey_defs[i]);
+        if (!entry.empty())
+        {
+            text += entry;
+            found = true;
+        }
+    }
+
     if (!found)
         text += "<lightgrey>No accepted quests.</lightgrey>\n\nTalk to townspeople in Stone Stew towns to find work.\n";
 
@@ -568,6 +727,7 @@ enum stone_stew_dialogue_action
     SSDA_TRADE,
     SSDA_TRAINING,
     SSDA_GUILD,
+    SSDA_GUILD_WORK,
 };
 
 static bool _stone_stew_town_npc_talk(const monster& mon)
@@ -866,6 +1026,14 @@ static bool _stone_stew_town_npc_has_guild(const monster& mon)
     return mon.mname == "Guild Factor" && _stone_stew_current_guild();
 }
 
+static bool _stone_stew_town_npc_has_guild_work(const monster& mon)
+{
+    return mon.mname == "Guild Factor"
+           && _stone_stew_current_guild()
+           && _stone_stew_current_guild_joined()
+           && _stone_stew_current_survey();
+}
+
 static bool _stone_stew_town_npc_trade(const monster& mon)
 {
     if (mon.mname == "Mara the Coinwise")
@@ -937,7 +1105,7 @@ static bool _stone_stew_town_npc_guild(const monster& mon)
     if (_stone_stew_current_guild_joined())
     {
         mprf("\"You are already on the rolls of the %s,\" the factor says. "
-             "\"Proper contracts will follow once the guild boards open.\"",
+             "\"Check Guild Work if you want a posted contract.\"",
              guild->name);
         return true;
     }
@@ -955,7 +1123,74 @@ static bool _stone_stew_town_npc_guild(const monster& mon)
         you.props[key].get_bool() = true;
 
     mprf("You join the %s.", guild->name);
-    mpr("Guild quests and rewards are not active yet, but your membership is recorded for this run.");
+    mpr("You can now ask this Guild Factor about Guild Work.");
+    return true;
+}
+
+static bool _stone_stew_town_npc_guild_work(const monster& mon)
+{
+    if (mon.mname != "Guild Factor")
+    {
+        mpr("They are not handling guild contracts right now.");
+        return true;
+    }
+
+    if (!_stone_stew_current_guild_joined())
+    {
+        mpr("\"Join the chapter before asking for writs,\" the factor says.");
+        return true;
+    }
+
+    const stone_stew_guild_survey_def *survey = _stone_stew_current_survey();
+    if (!survey)
+    {
+        mpr("There is no guild work posted here yet.");
+        return true;
+    }
+
+    const int state = _stone_stew_survey_state(*survey);
+    if (state == SSQ_UNOFFERED)
+    {
+        mprf("<yellow>%s</yellow>", survey->title);
+        mpr(survey->offer);
+        mprf("Objective: Reach %s, then return to the Guild Factor.",
+             _stone_stew_survey_target_name(*survey).c_str());
+        mprf("Reward: %d gold pieces.", survey->reward_gold);
+
+        if (!yesno("Accept this guild survey contract?", true, 'n'))
+        {
+            mpr("\"The board keeps its nails,\" the factor says.");
+            return true;
+        }
+
+        _stone_stew_set_survey_state(*survey, SSQ_ACTIVE);
+        mpr(survey->accepted);
+        mpr("You can review accepted quests with <lightgrey>Ctrl+T</lightgrey>.");
+        return true;
+    }
+
+    if (state == SSQ_ACTIVE)
+    {
+        if (_stone_stew_survey_complete(*survey))
+        {
+            mpr(survey->ready);
+            mprf("The guild pays you %d gold pieces.", survey->reward_gold);
+            you.add_gold(survey->reward_gold);
+            _stone_stew_set_survey_state(*survey, SSQ_COMPLETED);
+            return true;
+        }
+
+        mpr(survey->incomplete);
+        return true;
+    }
+
+    if (state == SSQ_COMPLETED)
+    {
+        mpr(survey->completed);
+        return true;
+    }
+
+    mpr("That guild contract is no longer available.");
     return true;
 }
 
@@ -973,6 +1208,8 @@ static string _stone_stew_dialogue_action_name(stone_stew_dialogue_action action
         return "Training";
     case SSDA_GUILD:
         return "Guild";
+    case SSDA_GUILD_WORK:
+        return "Guild Work";
     }
 
     return "";
@@ -996,6 +1233,9 @@ static vector<stone_stew_dialogue_action> _stone_stew_dialogue_actions(
 
     if (_stone_stew_town_npc_has_guild(mon))
         actions.push_back(SSDA_GUILD);
+
+    if (_stone_stew_town_npc_has_guild_work(mon))
+        actions.push_back(SSDA_GUILD_WORK);
 
     return actions;
 }
@@ -1026,6 +1266,8 @@ static bool _stone_stew_run_dialogue_action(stone_stew_dialogue_action action,
         return _stone_stew_town_npc_training(mon);
     case SSDA_GUILD:
         return _stone_stew_town_npc_guild(mon);
+    case SSDA_GUILD_WORK:
+        return _stone_stew_town_npc_guild_work(mon);
     }
 
     return true;
@@ -1057,6 +1299,9 @@ static bool _stone_stew_try_shortcut_action(
         break;
     case 'g':
         action = SSDA_GUILD;
+        break;
+    case 'w':
+        action = SSDA_GUILD_WORK;
         break;
     default:
         matched = false;
