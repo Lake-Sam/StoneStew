@@ -3069,6 +3069,23 @@ static const map_def *_dgn_random_map_for_place(bool minivault)
 
 #if TAG_MAJOR_VERSION == 34
     if (!minivault
+        && (lid.branch == BRANCH_DWARF || lid.branch == BRANCH_FOREST))
+    {
+        const char *map_name = lid.branch == BRANCH_DWARF
+                               ? "stone_stew_mid_dungeon_town"
+                               : "stone_stew_lair_town";
+        const map_def *vault = find_map_by_name(map_name);
+
+        if (vault)
+            return vault;
+
+        end(1, false, "Couldn't find Stone Stew town map '%s' for level %s.",
+            map_name, lid.describe().c_str());
+    }
+#endif
+
+#if TAG_MAJOR_VERSION == 34
+    if (!minivault
         && player_in_branch(BRANCH_TOMB)
         && you.props[TOMB_STONE_STAIRS_KEY])
     {
