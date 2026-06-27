@@ -222,14 +222,14 @@ const Branch branches[NUM_BRANCHES] =
       {BRANCH_DEPTHS} },
 #if TAG_MAJOR_VERSION == 34
 
-    { BRANCH_FOREST, BRANCH_VAULTS, 2, 3, 5, 19,
-      brflag::spotty,
+    { BRANCH_FOREST, BRANCH_LAIR, 2, 3, 1, 12,
+      brflag::fully_map,
       DNGN_ENTER_FOREST, DNGN_EXIT_FOREST, NUM_FEATURES,
-      "Forest", "the Enchanted Forest", "Forest",
-      nullptr,
-      BROWN, BROWN,
+      "Lair Town", "a Lair town", "LairTown",
+      "You step into a safe clearing held between root, lantern, and stone.",
+      GREEN, BROWN,
       'F', {}, branch_noise::normal, DEFAULT_MON_DIE_SIZE,
-      {} },
+      {BRANCH_LAIR} },
 #endif
 
     { BRANCH_ABYSS, NUM_BRANCHES, -1, -1, 7, 24,

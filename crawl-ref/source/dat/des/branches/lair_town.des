@@ -1,0 +1,46 @@
+##############################################################################
+# Stone Stew Lair town prototype.
+##############################################################################
+
+NAME:   stone_stew_lair_town
+DEPTH:  LairTown
+TAGS:   no_monster_gen no_trap_gen no_rotate no_pool_fixup encompass
+KFEAT:  > = exit_lair_town
+KFEAT:  A = altar_fedhas / altar_elyvilon / altar_cheibriados / altar_hepliaklqana / altar_ru / altar_wu_jian
+KFEAT:  B = altar_okawaru / altar_trog / altar_gozag / altar_nemelex_xobeh / altar_qazlal / altar_uskayaw
+KFEAT:  S = general shop
+KFEAT:  F = fountain_blue
+KMONS:  W = human att:good_neutral name:Lantern_Warden name_replace ; spear . leather armour
+KMONS:  P = human att:good_neutral name:Town_Priest name_replace ; quarterstaff . robe
+KMONS:  H = human att:good_neutral name:Root_Hunter name_replace ; spear . leather armour
+KMONS:  L = human att:good_neutral name:Lair_Healer name_replace ; staff . robe
+KMONS:  G = human att:good_neutral name:Guild_Factor name_replace ; short sword . leather armour
+KMONS:  T = human att:good_neutral name:townsperson name_replace ; nothing
+TILE:   x = wall_vines
+FTILE:  .+ABFSWHPLGT> = floor_grass
+FTILE:  c = floor_pebble_brown
+FTILE:  v = floor_grass_dark
+MAP
+vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+vvvvvxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxvvvvv
+vvvvvx...........x.............x.........xvvvvv
+vvvvvx..W........+.....S.......+...H.....xvvvvv
+vvvvvx...........x.............x.........xvvvvv
+vvvvvxxxxxx+xxxxxxxxxxx+xxxxxxxxxxx+xxxxxvvvvv
+vvvvvxcccccccccccccccccccccccccccccccccccxvvvvv
+vvvvvxcccvvvvvvcccccccccccccccvvvvvvccccxvvvvv
+vvvvvxcccv....vcccccFcccccccccv....vccccxvvvvv
+vvvvvxcccv.A..vccccc{cccccccccv..B.vccccxvvvvv
+vvvvvxcccv.P..vcccccccccccccccv..P.vccccxvvvvv
+vvvvvxcccvvvvvvcccccccccccccccvvvvvvccccxvvvvv
+vvvvvxcccccccccccccccccccccccccccccccccccxvvvvv
+vvvvvxxxxxx+xxxxxxxxxxx+xxxxxxxxxxx+xxxxxvvvvv
+vvvvvx...........x.............x.........xvvvvv
+vvvvvx..G........+.....L.......+...T.....xvvvvv
+vvvvvx...........x.............x.........xvvvvv
+vvvvvxxxxxxxxxxxxxxxxxxx+xxxxxxxxxxxxxxxxxvvvvv
+vvvvvvvvvvvvvvvvvvvvv.......vvvvvvvvvvvvvvvvvvv
+vvvvvvvvvvvvvvvvvvvvv...>...vvvvvvvvvvvvvvvvvvv
+vvvvvvvvvvvvvvvvvvvvv.......vvvvvvvvvvvvvvvvvvv
+vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+ENDMAP

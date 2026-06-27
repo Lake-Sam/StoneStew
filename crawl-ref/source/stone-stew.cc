@@ -36,6 +36,8 @@ static const char *STONE_STEW_RELLAN_FIGHTING_TRAINING_KEY =
 static const char *STONE_STEW_TOWN_HOME_KEY = "stone_stew_town_home";
 static const char *STONE_STEW_MID_DUNGEON_TOWN_NAME_KEY =
     "stone_stew_mid_dungeon_town_name";
+static const char *STONE_STEW_LAIR_TOWN_NAME_KEY =
+    "stone_stew_lair_town_name";
 static const int STONE_STEW_RELLAN_FIGHTING_TRAINING_COST = 60;
 static const int STONE_STEW_RELLAN_FIGHTING_TRAINING_POINTS = 180;
 
@@ -185,27 +187,67 @@ static const stone_stew_quest_def STONE_STEW_QUESTS[] =
 static const int STONE_STEW_NUM_QUESTS =
     sizeof(STONE_STEW_QUESTS) / sizeof(STONE_STEW_QUESTS[0]);
 
-static string _stone_stew_mid_dungeon_town_name()
+static string _stone_stew_make_town_name(const char *prop_key,
+                                         const char **prefixes,
+                                         int num_prefixes,
+                                         const char **suffixes,
+                                         int num_suffixes)
 {
-    if (!you.props.exists(STONE_STEW_MID_DUNGEON_TOWN_NAME_KEY))
+    if (!you.props.exists(prop_key))
     {
-        static const char *prefixes[] =
-        {
-            "Moss", "Copper", "Ash", "Lantern", "Root", "Brine",
-            "Ember", "Stone", "Nerul's", "Grey"
-        };
-        static const char *suffixes[] =
-        {
-            "gate", "hall", "Rest", "Stair", "Market", "Well",
-            "Hearth", "Crossing", "Watch", "Haven"
-        };
-
-        you.props[STONE_STEW_MID_DUNGEON_TOWN_NAME_KEY] =
-            string(prefixes[random2(ARRAYSZ(prefixes))])
-            + suffixes[random2(ARRAYSZ(suffixes))];
+        const string prefix = prefixes[random2(num_prefixes)];
+        const string suffix = suffixes[random2(num_suffixes)];
+        const bool possessive = prefix.size() >= 2
+                                && prefix.substr(prefix.size() - 2) == "'s";
+        you.props[prop_key] = possessive ? prefix + " " + suffix
+                                         : prefix + suffix;
     }
 
-    return you.props[STONE_STEW_MID_DUNGEON_TOWN_NAME_KEY].get_string();
+    return you.props[prop_key].get_string();
+}
+
+static string _stone_stew_mid_dungeon_town_name()
+{
+    static const char *prefixes[] =
+    {
+        "Moss", "Copper", "Ash", "Lantern", "Root", "Brine",
+        "Ember", "Stone", "Nerul's", "Grey"
+    };
+    static const char *suffixes[] =
+    {
+        "gate", "hall", "Rest", "Stair", "Market", "Well",
+        "Hearth", "Crossing", "Watch", "Haven"
+    };
+
+    return _stone_stew_make_town_name(STONE_STEW_MID_DUNGEON_TOWN_NAME_KEY,
+                                      prefixes, ARRAYSZ(prefixes),
+                                      suffixes, ARRAYSZ(suffixes));
+}
+
+static string _stone_stew_lair_town_name()
+{
+    static const char *prefixes[] =
+    {
+        "Moss", "Fern", "Root", "Green", "Thorn", "Rain",
+        "Bark", "Willow", "Hunter's", "Deep"
+    };
+    static const char *suffixes[] =
+    {
+        "gate", "well", "watch", "hollow", "rest", "den",
+        "hearth", "grove", "stand", "shade"
+    };
+
+    return _stone_stew_make_town_name(STONE_STEW_LAIR_TOWN_NAME_KEY,
+                                      prefixes, ARRAYSZ(prefixes),
+                                      suffixes, ARRAYSZ(suffixes));
+}
+
+static string _stone_stew_current_town_name()
+{
+    if (you.where_are_you == BRANCH_FOREST)
+        return _stone_stew_lair_town_name();
+
+    return _stone_stew_mid_dungeon_town_name();
 }
 
 bool stone_stew_is_town_npc(const monster& mon)
@@ -220,7 +262,9 @@ bool stone_stew_is_town_npc(const monster& mon)
                || mon.mname == "Town Priest"
                || mon.mname == "Town Broker"
                || mon.mname == "Guild Factor"
-               || mon.mname == "Lantern Warden");
+               || mon.mname == "Lantern Warden"
+               || mon.mname == "Root Hunter"
+               || mon.mname == "Lair Healer");
 }
 
 static bool _stone_stew_mon_is_giver(const monster& mon,
@@ -449,7 +493,7 @@ static bool _stone_stew_town_npc_talk(const monster& mon)
     {
         mprf("\"%s keeps shrines for travelers who still have choices,\" "
              "the priest says. \"Pray if the god's eye finds you.\"",
-             _stone_stew_mid_dungeon_town_name().c_str());
+             _stone_stew_current_town_name().c_str());
         return true;
     }
 
@@ -457,7 +501,7 @@ static bool _stone_stew_town_npc_talk(const monster& mon)
     {
         mprf("\"%s buys stories before it buys steel,\" the broker says. "
              "\"Bring stranger goods when the roads below open wider.\"",
-             _stone_stew_mid_dungeon_town_name().c_str());
+             _stone_stew_current_town_name().c_str());
         return true;
     }
 
@@ -472,17 +516,34 @@ static bool _stone_stew_town_npc_talk(const monster& mon)
     {
         mprf("\"Welcome to %s,\" the warden says. "
              "\"No blades drawn inside the lamps.\"",
-             _stone_stew_mid_dungeon_town_name().c_str());
+             _stone_stew_current_town_name().c_str());
+        return true;
+    }
+
+    if (mon.mname == "Root Hunter")
+    {
+        mprf("\"%s sits where the beasts remember the path,\" "
+             "the hunter says. \"Learn the wind before you follow blood.\"",
+             _stone_stew_lair_town_name().c_str());
+        return true;
+    }
+
+    if (mon.mname == "Lair Healer")
+    {
+        mprf("\"Venom, claw, fever, fear,\" the healer says. "
+             "\"%s has salves for some of them.\"",
+             _stone_stew_lair_town_name().c_str());
         return true;
     }
 
     if (mon.mname == "townsperson")
     {
-        if (you.where_are_you == BRANCH_DWARF)
+        if (you.where_are_you == BRANCH_DWARF
+            || you.where_are_you == BRANCH_FOREST)
         {
             mprf("The townsperson gives you a cautious nod. "
                  "\"%s is safe ground, if you keep it that way.\"",
-                 _stone_stew_mid_dungeon_town_name().c_str());
+                 _stone_stew_current_town_name().c_str());
         }
         else
             mpr("The townsperson gives you a cautious nod.");
@@ -895,7 +956,9 @@ static int _stone_stew_town_npc_roam_radius(const monster& mon)
     if (mon.mname == "Town Priest"
         || mon.mname == "Town Broker"
         || mon.mname == "Guild Factor"
-        || mon.mname == "Lantern Warden")
+        || mon.mname == "Lantern Warden"
+        || mon.mname == "Root Hunter"
+        || mon.mname == "Lair Healer")
     {
         return 4;
     }
