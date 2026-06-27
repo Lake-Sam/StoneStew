@@ -9,19 +9,24 @@
 
 #include "artefact.h"
 #include "branch.h"
+#include "files.h"
 #include "invent.h"
 #include "items.h"
 #include "libutil.h"
 #include "macro.h"
 #include "message.h"
 #include "monster.h"
+#include "notes.h"
 #include "player.h"
 #include "prompt.h"
 #include "scroller.h"
 #include "shopping.h"
 #include "skills.h"
 #include "stringutil.h"
+#include "syscalls.h"
 #include "travel.h"
+
+#include <cstdio>
 
 static const char *STONE_STEW_RELLAN_QUEST_KEY =
     "stone_stew_rellan_first_depth_quest";
@@ -66,6 +71,18 @@ static const char *STONE_STEW_LAIR_HUNTER_DODGING_KEY =
     "stone_stew_lair_hunter_dodging_training";
 static const char *STONE_STEW_LAIR_HEALER_STEALTH_KEY =
     "stone_stew_lair_healer_stealth_training";
+static const char *STONE_STEW_TOWN_MORAL_TEMPLATE_KEY =
+    "stone_stew_town_moral_template";
+static const char *STONE_STEW_TOWN_MORAL_BRANCH_KEY =
+    "stone_stew_town_moral_branch";
+static const char *STONE_STEW_TOWN_MORAL_STATE_KEY =
+    "stone_stew_town_moral_state";
+static const char *STONE_STEW_TOWN_MORAL_TARGET_XL_KEY =
+    "stone_stew_town_moral_target_xl";
+static const char *STONE_STEW_TOWN_MORAL_OUTCOME_KEY =
+    "stone_stew_town_moral_outcome";
+static const char *STONE_STEW_LLM_NOTICE_KEY =
+    "stone_stew_llm_notice";
 static const int STONE_STEW_RELLAN_FIGHTING_TRAINING_COST = 60;
 static const int STONE_STEW_RELLAN_FIGHTING_TRAINING_POINTS = 180;
 static const int STONE_STEW_GUILD_BENEFIT_SKILL_POINTS = 220;
@@ -137,6 +154,34 @@ struct stone_stew_training_def
     const char *poor;
     const char *complete;
 };
+
+struct stone_stew_moral_choice
+{
+    string label;
+    string player_line;
+    string result;
+    int reward_mod = 0;
+};
+
+struct stone_stew_moral_template
+{
+    string id;
+    string giver;
+    string title;
+    string offer;
+    string objective;
+    string reward;
+    string risk;
+    string failure;
+    string accepted;
+    string incomplete;
+    int target_xl_delta = 1;
+    int base_gold = 20;
+    int gold_per_xl = 5;
+    stone_stew_moral_choice choices[3];
+};
+
+static string _stone_stew_current_town_name();
 
 static bool _stone_stew_rellan_complete()
 {
@@ -315,6 +360,566 @@ static const stone_stew_quest_def STONE_STEW_QUESTS[] =
 
 static const int STONE_STEW_NUM_QUESTS =
     sizeof(STONE_STEW_QUESTS) / sizeof(STONE_STEW_QUESTS[0]);
+
+static string _stone_stew_substitute(string text)
+{
+    text = replace_all(text, "{town}", _stone_stew_current_town_name());
+    text = replace_all(text, "{branch}", branches[you.where_are_you].longname);
+    text = replace_all(text, "{xl}", make_stringf("%d", you.experience_level));
+    return text;
+}
+
+static string _stone_stew_town_moral_key(const char *base)
+{
+    return string(base) + "_" + make_stringf("%d", you.where_are_you);
+}
+
+static string _stone_stew_unescape(string text)
+{
+    text = replace_all(text, "\\n", "\n");
+    text = replace_all(text, "\\\"", "\"");
+    text = replace_all(text, "\\\\", "\\");
+    return text;
+}
+
+static void _stone_stew_set_template_field(stone_stew_moral_template& tmpl,
+                                           const string& key,
+                                           const string& value)
+{
+    if (key == "id")
+        tmpl.id = value;
+    else if (key == "giver")
+        tmpl.giver = value;
+    else if (key == "title")
+        tmpl.title = value;
+    else if (key == "offer")
+        tmpl.offer = value;
+    else if (key == "objective")
+        tmpl.objective = value;
+    else if (key == "reward")
+        tmpl.reward = value;
+    else if (key == "risk")
+        tmpl.risk = value;
+    else if (key == "failure")
+        tmpl.failure = value;
+    else if (key == "accepted")
+        tmpl.accepted = value;
+    else if (key == "incomplete")
+        tmpl.incomplete = value;
+    else if (key == "target_xl_delta")
+        tmpl.target_xl_delta = max(1, atoi(value.c_str()));
+    else if (key == "base_gold")
+        tmpl.base_gold = max(0, atoi(value.c_str()));
+    else if (key == "gold_per_xl")
+        tmpl.gold_per_xl = max(0, atoi(value.c_str()));
+    else if (starts_with(key, "choice"))
+    {
+        const int choice = key.size() > 6 ? key[6] - '1' : -1;
+        if (choice < 0 || choice >= 3)
+            return;
+
+        const string suffix = key.size() > 8 ? key.substr(8) : "";
+        if (suffix == "label")
+            tmpl.choices[choice].label = value;
+        else if (suffix == "player")
+            tmpl.choices[choice].player_line = value;
+        else if (suffix == "result")
+            tmpl.choices[choice].result = value;
+        else if (suffix == "reward_mod")
+            tmpl.choices[choice].reward_mod = atoi(value.c_str());
+    }
+}
+
+static bool _stone_stew_template_complete(
+    const stone_stew_moral_template& tmpl)
+{
+    if (tmpl.id.empty() || tmpl.giver.empty() || tmpl.title.empty()
+        || tmpl.offer.empty() || tmpl.objective.empty())
+    {
+        return false;
+    }
+
+    for (int i = 0; i < 3; ++i)
+    {
+        if (tmpl.choices[i].label.empty()
+            || tmpl.choices[i].player_line.empty()
+            || tmpl.choices[i].result.empty())
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+static vector<stone_stew_moral_template> _stone_stew_load_moral_templates()
+{
+    vector<stone_stew_moral_template> templates;
+    const string path = datafile_path("stone-stew/quest_templates.txt", false);
+    FILE *fp = fopen_u(path.c_str(), "r");
+    if (!fp)
+        return templates;
+
+    stone_stew_moral_template current;
+    char buffer[4096];
+    while (fgets(buffer, sizeof(buffer), fp))
+    {
+        string line = trimmed_string(buffer);
+        if (line.empty() || line[0] == '#')
+            continue;
+
+        if (line == "---")
+        {
+            if (_stone_stew_template_complete(current))
+                templates.push_back(current);
+            current = stone_stew_moral_template();
+            continue;
+        }
+
+        const string::size_type split = line.find('=');
+        if (split == string::npos)
+            continue;
+
+        string key = trimmed_string(line.substr(0, split));
+        string value = trimmed_string(line.substr(split + 1));
+        _stone_stew_set_template_field(current, key,
+                                       _stone_stew_unescape(value));
+    }
+
+    if (_stone_stew_template_complete(current))
+        templates.push_back(current);
+
+    fclose(fp);
+    return templates;
+}
+
+static const stone_stew_moral_template *_stone_stew_current_moral_template()
+{
+    static vector<stone_stew_moral_template> templates =
+        _stone_stew_load_moral_templates();
+    static stone_stew_moral_template fallback;
+    if (fallback.id.empty())
+    {
+        fallback.id = "fallback_moral_cache";
+        fallback.giver = "townsperson";
+        fallback.title = "A Borrowed Mercy";
+        fallback.offer = "\"Two neighbors claim the same hidden cache,\" "
+                         "the townsperson says. \"One needs it, one earned "
+                         "it, and both have witnesses who lie.\"";
+        fallback.objective = "Reach the target experience level, then return "
+                             "to judge the cache.";
+        fallback.reward = "Scaled gold based on your level and chosen "
+                          "resolution.";
+        fallback.risk = "Moderate. This asks you to survive more of the local "
+                        "branch.";
+        fallback.failure = "If the giver dies, the town problem dies with "
+                           "them.";
+        fallback.accepted = "You agree to return once the dungeon has made "
+                            "your name heavier.";
+        fallback.incomplete = "\"Not yet,\" the townsperson says. \"Come back "
+                              "after the road has tested your judgment.\"";
+        fallback.target_xl_delta = 1;
+        fallback.base_gold = 20;
+        fallback.gold_per_xl = 5;
+        fallback.choices[0].label = "Give it to the needy claimant.";
+        fallback.choices[0].player_line = "\"Need outweighs ledgers today.\"";
+        fallback.choices[0].result = "The poor claimant weeps with relief. "
+                                     "The other spits your name into the dust.";
+        fallback.choices[0].reward_mod = -5;
+        fallback.choices[1].label = "Give it to the legal claimant.";
+        fallback.choices[1].player_line = "\"Proof matters, even when mercy "
+                                          "complains.\"";
+        fallback.choices[1].result = "The lawful claimant bows once. The "
+                                     "hungry one leaves town before sunset.";
+        fallback.choices[1].reward_mod = 0;
+        fallback.choices[2].label = "Split the cache and shame them both.";
+        fallback.choices[2].player_line = "\"You both brought lies to a "
+                                          "starving table.\"";
+        fallback.choices[2].result = "Neither claimant thanks you, which may "
+                                     "be the closest this town comes to "
+                                     "justice.";
+        fallback.choices[2].reward_mod = 5;
+    }
+
+    if (templates.empty())
+        return &fallback;
+
+    const int branch = static_cast<int>(you.where_are_you);
+    const string template_key =
+        _stone_stew_town_moral_key(STONE_STEW_TOWN_MORAL_TEMPLATE_KEY);
+    const string branch_key =
+        _stone_stew_town_moral_key(STONE_STEW_TOWN_MORAL_BRANCH_KEY);
+    const bool needs_pick = !you.props.exists(template_key)
+                            || !you.props.exists(branch_key)
+                            || you.props[branch_key].get_int()
+                               != branch;
+    if (needs_pick)
+    {
+        you.props[template_key] = random2(static_cast<int>(templates.size()));
+        you.props[branch_key] = branch;
+    }
+
+    int index = you.props[template_key].get_int();
+    if (index < 0 || index >= static_cast<int>(templates.size()))
+    {
+        index = 0;
+        you.props[template_key] = index;
+    }
+
+    return &templates[index];
+}
+
+static int _stone_stew_town_moral_state()
+{
+    const string key = _stone_stew_town_moral_key(STONE_STEW_TOWN_MORAL_STATE_KEY);
+    if (!you.props.exists(key))
+        return SSQ_UNOFFERED;
+
+    return you.props[key].get_int();
+}
+
+static void _stone_stew_set_town_moral_state(int state)
+{
+    you.props[_stone_stew_town_moral_key(STONE_STEW_TOWN_MORAL_STATE_KEY)] =
+        state;
+}
+
+static int _stone_stew_town_moral_target_xl(
+    const stone_stew_moral_template& tmpl)
+{
+    const string key =
+        _stone_stew_town_moral_key(STONE_STEW_TOWN_MORAL_TARGET_XL_KEY);
+    if (!you.props.exists(key))
+    {
+        you.props[key] = max(2, you.experience_level + tmpl.target_xl_delta);
+    }
+
+    return you.props[key].get_int();
+}
+
+static int _stone_stew_town_moral_reward(
+    const stone_stew_moral_template& tmpl, int choice)
+{
+    const int target_xl = _stone_stew_town_moral_target_xl(tmpl);
+    const int modifier = choice >= 0 && choice < 3
+                         ? tmpl.choices[choice].reward_mod
+                         : 0;
+    return max(0, tmpl.base_gold + target_xl * tmpl.gold_per_xl + modifier);
+}
+
+static string _stone_stew_json_escape(const string& text)
+{
+    string out;
+    for (char c : text)
+    {
+        switch (c)
+        {
+        case '\\':
+            out += "\\\\";
+            break;
+        case '"':
+            out += "\\\"";
+            break;
+        case '\n':
+            out += "\\n";
+            break;
+        case '\r':
+            break;
+        default:
+            out += c;
+            break;
+        }
+    }
+    return out;
+}
+
+static string _stone_stew_json_unescape(string text)
+{
+    string out;
+    bool escaped = false;
+    for (char c : text)
+    {
+        if (escaped)
+        {
+            if (c == 'n')
+                out += '\n';
+            else
+                out += c;
+            escaped = false;
+        }
+        else if (c == '\\')
+            escaped = true;
+        else
+            out += c;
+    }
+    return out;
+}
+
+static string _stone_stew_extract_json_response(const string& json)
+{
+    const string needle = "\"response\":\"";
+    string::size_type start = json.find(needle);
+    if (start == string::npos)
+        return "";
+
+    start += needle.size();
+    string response;
+    bool escaped = false;
+    for (string::size_type i = start; i < json.size(); ++i)
+    {
+        const char c = json[i];
+        if (escaped)
+        {
+            response += '\\';
+            response += c;
+            escaped = false;
+        }
+        else if (c == '\\')
+            escaped = true;
+        else if (c == '"')
+            break;
+        else
+            response += c;
+    }
+
+    return trimmed_string(_stone_stew_json_unescape(response));
+}
+
+static string _stone_stew_llm_flavour(const monster& mon, const string& topic)
+{
+    const string prompt = make_stringf(
+        "Write one short in-character line for a Dungeon Crawl Stone Soup fork "
+        "NPC. NPC name: %s. Town: %s. Topic: %s. Allowed facts only: towns, "
+        "guilds, priests, quests, shops, training, gold, artefacts, Dungeon, "
+        "Lair, and the known DCSS gods. Do not invent mechanics. Keep under "
+        "24 words.",
+        mon.name(DESC_PLAIN).c_str(), _stone_stew_current_town_name().c_str(),
+        topic.c_str());
+
+    const string body = "{\"model\":\"qwen3:1.7b\",\"stream\":false,"
+                        "\"options\":{\"think\":false},\"prompt\":\""
+                        + _stone_stew_json_escape(prompt) + "\"}";
+    const string command = "curl --silent --max-time 3 "
+                           "-H \"Content-Type: application/json\" "
+                           "-d \"" + _stone_stew_json_escape(body) + "\" "
+                           "http://127.0.0.1:11434/api/generate";
+
+#ifdef WIN32
+    FILE *pipe = _popen(command.c_str(), "r");
+#else
+    FILE *pipe = popen(command.c_str(), "r");
+#endif
+    if (!pipe)
+        return "";
+
+    string output;
+    char buffer[1024];
+    while (fgets(buffer, sizeof(buffer), pipe))
+        output += buffer;
+
+#ifdef WIN32
+    _pclose(pipe);
+#else
+    pclose(pipe);
+#endif
+
+    return _stone_stew_extract_json_response(output);
+}
+
+static void _stone_stew_maybe_print_llm_flavour(const monster& mon,
+                                                const string& topic)
+{
+    const string line = _stone_stew_llm_flavour(mon, topic);
+    if (!line.empty())
+        mprf("%s says, \"%s\"", mon.name(DESC_THE).c_str(), line.c_str());
+    else if (!you.props.exists(STONE_STEW_LLM_NOTICE_KEY))
+    {
+        you.props[STONE_STEW_LLM_NOTICE_KEY] = true;
+        mpr("<darkgrey>Stone Stew LLM fallback: no localhost Ollama response.</darkgrey>");
+    }
+}
+
+static string _stone_stew_moral_offer_text(
+    const stone_stew_moral_template& tmpl)
+{
+    const int target_xl = _stone_stew_town_moral_target_xl(tmpl);
+    string text = "<yellow>";
+    text += _stone_stew_substitute(tmpl.title);
+    text += "</yellow>\n\n";
+    text += _stone_stew_substitute(tmpl.offer);
+    text += "\n\nGiver: ";
+    text += tmpl.giver;
+    text += "\nObjective: ";
+    text += replace_all(_stone_stew_substitute(tmpl.objective),
+                        "{target_xl}", make_stringf("%d", target_xl));
+    text += "\nReward: ";
+    text += _stone_stew_substitute(tmpl.reward);
+    text += "\nRisk: ";
+    text += _stone_stew_substitute(tmpl.risk);
+    text += "\nFailure: ";
+    text += _stone_stew_substitute(tmpl.failure);
+    text += "\n\n<lightgrey>Press a/y/Enter to accept, d/n/Esc to decline.</lightgrey>";
+    return text;
+}
+
+class stone_stew_moral_offer_popup : public formatted_scroller
+{
+public:
+    stone_stew_moral_offer_popup(const stone_stew_moral_template& tmpl)
+        : formatted_scroller(FS_PREWRAPPED_TEXT,
+                             _stone_stew_moral_offer_text(tmpl))
+    {
+        set_tag("stone-stew-moral-offer");
+        set_title(formatted_string::parse_string("<white>Quest Offer</white>"));
+        set_more(formatted_string::parse_string("<lightgrey>a</lightgrey> Accept  <lightgrey>d</lightgrey> Decline"));
+    }
+
+    bool accepted() const { return m_accepted; }
+
+private:
+    maybe_bool process_key(int ch) override
+    {
+        const int key = toalower(ch);
+        if (key == 'a' || key == 'y' || key == CK_ENTER)
+        {
+            m_accepted = true;
+            return false;
+        }
+
+        if (key == 'd' || key == 'n' || key_is_escape(key))
+        {
+            m_accepted = false;
+            return false;
+        }
+
+        return formatted_scroller::process_key(ch);
+    }
+
+    bool m_accepted = false;
+};
+
+static int _stone_stew_choose_moral_outcome(
+    const stone_stew_moral_template& tmpl)
+{
+    mprf("<yellow>%s</yellow>", _stone_stew_substitute(tmpl.title).c_str());
+    for (int i = 0; i < 3; ++i)
+    {
+        mprf("<lightgrey>%d</lightgrey> %s",
+             i + 1, _stone_stew_substitute(tmpl.choices[i].label).c_str());
+    }
+    mpr("<lightgrey>Esc</lightgrey> Decide later");
+
+    while (true)
+    {
+        const int key = getchm();
+        if (key_is_escape(key) || key == ' ')
+            return -1;
+
+        if (key >= '1' && key <= '3')
+            return key - '1';
+
+        mpr("Choose one of the three responses, or Esc.");
+    }
+}
+
+static string _stone_stew_moral_log_entry(
+    const stone_stew_moral_template& tmpl)
+{
+    const int state = _stone_stew_town_moral_state();
+    if (state != SSQ_ACTIVE)
+        return "";
+
+    const int target_xl = _stone_stew_town_moral_target_xl(tmpl);
+    string text = "<yellow>";
+    text += _stone_stew_substitute(tmpl.title);
+    text += "</yellow>\n";
+    text += "Giver: ";
+    text += tmpl.giver;
+    text += " in ";
+    text += _stone_stew_current_town_name();
+    text += "\nObjective: ";
+    text += replace_all(_stone_stew_substitute(tmpl.objective),
+                        "{target_xl}", make_stringf("%d", target_xl));
+    text += "\nReward: ";
+    text += _stone_stew_substitute(tmpl.reward);
+    text += "\nRisk: ";
+    text += _stone_stew_substitute(tmpl.risk);
+    text += "\nStatus: ";
+    text += you.experience_level >= target_xl ? "ready for judgment."
+                                              : "active.";
+    text += "\n\n";
+    return text;
+}
+
+static bool _stone_stew_townsperson_moral_quest(const monster& mon)
+{
+    const stone_stew_moral_template *tmpl =
+        _stone_stew_current_moral_template();
+    if (!tmpl || mon.mname != tmpl->giver)
+        return false;
+
+    const int state = _stone_stew_town_moral_state();
+    if (state == SSQ_UNOFFERED)
+    {
+        _stone_stew_maybe_print_llm_flavour(mon, "offering a local moral problem");
+        stone_stew_moral_offer_popup offer(*tmpl);
+        offer.show();
+
+        if (!offer.accepted())
+        {
+            mpr("You decline the work for now.");
+            return true;
+        }
+
+        _stone_stew_town_moral_target_xl(*tmpl);
+        _stone_stew_set_town_moral_state(SSQ_ACTIVE);
+        mpr(_stone_stew_substitute(tmpl->accepted));
+        mpr("You can review accepted quests with <lightgrey>Ctrl+T</lightgrey>.");
+        return true;
+    }
+
+    if (state == SSQ_ACTIVE)
+    {
+        const int target_xl = _stone_stew_town_moral_target_xl(*tmpl);
+        if (you.experience_level < target_xl)
+        {
+            string incomplete = replace_all(_stone_stew_substitute(tmpl->incomplete),
+                                            "{target_xl}",
+                                            make_stringf("%d", target_xl));
+            mpr(incomplete);
+            return true;
+        }
+
+        _stone_stew_maybe_print_llm_flavour(mon, "asking the player to judge a local dispute");
+        const int choice = _stone_stew_choose_moral_outcome(*tmpl);
+        if (choice < 0)
+        {
+            mpr("You leave the dispute unresolved for now.");
+            return true;
+        }
+
+        mpr(_stone_stew_substitute(tmpl->choices[choice].player_line));
+        mpr(_stone_stew_substitute(tmpl->choices[choice].result));
+        const int reward = _stone_stew_town_moral_reward(*tmpl, choice);
+        if (reward > 0)
+        {
+            mprf("The town pays you %d gold pieces.", reward);
+            you.add_gold(reward);
+        }
+        you.props[_stone_stew_town_moral_key(STONE_STEW_TOWN_MORAL_OUTCOME_KEY)]
+            = choice;
+        _stone_stew_set_town_moral_state(SSQ_COMPLETED);
+        take_note(Note(NOTE_USER_NOTE, 0, 0, "",
+                       make_stringf("Resolved %s in %s.",
+                                    tmpl->title.c_str(),
+                                    _stone_stew_current_town_name().c_str())),
+                  true);
+        return true;
+    }
+
+    mpr("This town's matter has already found its ending.");
+    return true;
+}
 
 static string _stone_stew_make_town_name(const char *prop_key,
                                          const char **prefixes,
@@ -793,6 +1398,17 @@ static string _stone_stew_quest_log_text()
     string text = "<white>Stone Stew Quest Log</white>\n\n";
     bool found = false;
 
+    if (const stone_stew_moral_template *tmpl =
+            _stone_stew_current_moral_template())
+    {
+        const string entry = _stone_stew_moral_log_entry(*tmpl);
+        if (!entry.empty())
+        {
+            text += entry;
+            found = true;
+        }
+    }
+
     for (int i = 0; i < STONE_STEW_NUM_QUESTS; ++i)
     {
         const stone_stew_quest_def& quest = STONE_STEW_QUESTS[i];
@@ -1025,6 +1641,9 @@ static bool _stone_stew_town_npc_talk(const monster& mon)
 
 static bool _stone_stew_town_npc_quest(const monster& mon)
 {
+    if (_stone_stew_townsperson_moral_quest(mon))
+        return true;
+
     bool has_quest = false;
     bool all_done = true;
     bool blocked_by_prereq = false;
@@ -1106,6 +1725,9 @@ static bool _stone_stew_town_npc_quest(const monster& mon)
 
 static bool _stone_stew_town_npc_has_quest(const monster& mon)
 {
+    if (mon.mname == _stone_stew_current_moral_template()->giver)
+        return _stone_stew_town_moral_state() != SSQ_COMPLETED;
+
     for (int i = 0; i < STONE_STEW_NUM_QUESTS; ++i)
         if (_stone_stew_mon_is_giver(mon, STONE_STEW_QUESTS[i]))
             return true;

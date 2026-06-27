@@ -2062,7 +2062,7 @@ int items(bool allow_uniques,
                                    212, OBJ_WEAPONS,
                                    176, OBJ_POTIONS,
                                    270, OBJ_SCROLLS,
-                                   440, OBJ_GOLD);
+                                    80, OBJ_GOLD);
 
         // misc items placement wholly dependent upon current depth {dlb}:
         if (item_level > 7 && x_chance_in_y(11 + item_level, 9000))
