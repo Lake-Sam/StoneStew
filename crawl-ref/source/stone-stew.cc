@@ -67,8 +67,6 @@ static const char *STONE_STEW_TOWN_MORAL_BRANCH_KEY =
     "stone_stew_town_moral_branch";
 static const char *STONE_STEW_TOWN_MORAL_STATE_KEY =
     "stone_stew_town_moral_state";
-static const char *STONE_STEW_TOWN_MORAL_TARGET_XL_KEY =
-    "stone_stew_town_moral_target_xl";
 static const char *STONE_STEW_TOWN_MORAL_OUTCOME_KEY =
     "stone_stew_town_moral_outcome";
 static const char *STONE_STEW_TOWN_MORAL_TRAINING_UNLOCK_KEY =
@@ -181,10 +179,7 @@ struct stone_stew_moral_template
     string risk;
     string failure;
     string accepted;
-    string incomplete;
-    int target_xl_delta = 1;
     int base_gold = 20;
-    int gold_per_xl = 5;
     stone_stew_moral_choice choices[3];
 };
 
@@ -443,14 +438,8 @@ static void _stone_stew_set_template_field(stone_stew_moral_template& tmpl,
         tmpl.failure = value;
     else if (key == "accepted")
         tmpl.accepted = value;
-    else if (key == "incomplete")
-        tmpl.incomplete = value;
-    else if (key == "target_xl_delta")
-        tmpl.target_xl_delta = max(1, atoi(value.c_str()));
     else if (key == "base_gold")
         tmpl.base_gold = max(0, atoi(value.c_str()));
-    else if (key == "gold_per_xl")
-        tmpl.gold_per_xl = max(0, atoi(value.c_str()));
     else if (starts_with(key, "choice"))
     {
         const int choice = key.size() > 6 ? key[6] - '1' : -1;
@@ -548,22 +537,18 @@ static const stone_stew_moral_template *_stone_stew_current_moral_template()
         fallback.offer = "\"Two neighbors claim the same hidden cache,\" "
                          "the townsperson says. \"One needs it, one earned "
                          "it, and both have witnesses who lie.\"";
-        fallback.objective = "Reach the target experience level, then return "
-                             "to judge the cache.";
-        fallback.reward = "Scaled gold based on your level and chosen "
+        fallback.objective = "Hear the claimants, choose who receives the "
+                             "cache, and accept the consequences.";
+        fallback.reward = "A modest town payment based on your chosen "
                           "resolution.";
         fallback.reward_family = "gold";
-        fallback.risk = "Moderate. This asks you to survive more of the local "
-                        "branch.";
+        fallback.risk = "Moderate. One side of the town will remember your "
+                        "judgment.";
         fallback.failure = "If the giver dies, the town problem dies with "
                            "them.";
-        fallback.accepted = "You agree to return once the dungeon has made "
-                            "your name heavier.";
-        fallback.incomplete = "\"Not yet,\" the townsperson says. \"Come back "
-                              "after the road has tested your judgment.\"";
-        fallback.target_xl_delta = 1;
+        fallback.accepted = "You agree to hear the dispute and make a "
+                            "judgment.";
         fallback.base_gold = 20;
-        fallback.gold_per_xl = 5;
         fallback.choices[0].label = "Give it to the needy claimant.";
         fallback.choices[0].player_line = "\"Need outweighs ledgers today.\"";
         fallback.choices[0].result = "The poor claimant weeps with relief. "
@@ -637,27 +622,13 @@ static void _stone_stew_set_town_moral_state(int state)
         state;
 }
 
-static int _stone_stew_town_moral_target_xl(
-    const stone_stew_moral_template& tmpl)
-{
-    const string key =
-        _stone_stew_town_moral_key(STONE_STEW_TOWN_MORAL_TARGET_XL_KEY);
-    if (!you.props.exists(key))
-    {
-        you.props[key] = max(2, you.experience_level + tmpl.target_xl_delta);
-    }
-
-    return you.props[key].get_int();
-}
-
 static int _stone_stew_town_moral_reward(
     const stone_stew_moral_template& tmpl, int choice)
 {
-    const int target_xl = _stone_stew_town_moral_target_xl(tmpl);
     const int modifier = choice >= 0 && choice < 3
                          ? tmpl.choices[choice].reward_mod
                          : 0;
-    return max(0, tmpl.base_gold + target_xl * tmpl.gold_per_xl + modifier);
+    return max(0, tmpl.base_gold + modifier);
 }
 
 static bool _stone_stew_skill_from_name(const string& name, skill_type& skill)
@@ -842,7 +813,6 @@ static void _stone_stew_maybe_print_llm_flavour(const monster& mon,
 static string _stone_stew_moral_offer_text(
     const stone_stew_moral_template& tmpl)
 {
-    const int target_xl = _stone_stew_town_moral_target_xl(tmpl);
     string text = "<yellow>";
     text += _stone_stew_substitute(tmpl.title);
     text += "</yellow>\n\n";
@@ -866,8 +836,7 @@ static string _stone_stew_moral_offer_text(
         text += ".";
     }
     text += "\nObjective: ";
-    text += replace_all(_stone_stew_substitute(tmpl.objective),
-                        "{target_xl}", make_stringf("%d", target_xl));
+    text += _stone_stew_substitute(tmpl.objective);
     text += "\nReward: ";
     text += _stone_stew_substitute(tmpl.reward);
     text += "\nReward family: ";
@@ -876,7 +845,7 @@ static string _stone_stew_moral_offer_text(
     text += _stone_stew_substitute(tmpl.risk);
     text += "\nFailure: ";
     text += _stone_stew_substitute(tmpl.failure);
-    text += "\n\n<lightgrey>Press a/y/Enter to accept, d/n/Esc to decline.</lightgrey>";
+    text += "\n\n<lightgrey>Press a/y/Enter to hear the choices, d/n/Esc to decline.</lightgrey>";
     return text;
 }
 
@@ -947,7 +916,6 @@ static string _stone_stew_moral_log_entry(
     if (state != SSQ_ACTIVE)
         return "";
 
-    const int target_xl = _stone_stew_town_moral_target_xl(tmpl);
     string text = "<yellow>";
     text += _stone_stew_substitute(tmpl.title);
     text += "</yellow>\n";
@@ -958,8 +926,7 @@ static string _stone_stew_moral_log_entry(
     text += " in ";
     text += _stone_stew_current_town_name();
     text += "\nObjective: ";
-    text += replace_all(_stone_stew_substitute(tmpl.objective),
-                        "{target_xl}", make_stringf("%d", target_xl));
+    text += _stone_stew_substitute(tmpl.objective);
     text += "\nReward: ";
     text += _stone_stew_substitute(tmpl.reward);
     text += "\nReward family: ";
@@ -967,10 +934,50 @@ static string _stone_stew_moral_log_entry(
     text += "\nRisk: ";
     text += _stone_stew_substitute(tmpl.risk);
     text += "\nStatus: ";
-    text += you.experience_level >= target_xl ? "ready for judgment."
-                                              : "active.";
+    text += "awaiting your judgment.";
     text += "\n\n";
     return text;
+}
+
+static bool _stone_stew_resolve_moral_choice(
+    const monster& mon, const stone_stew_moral_template& tmpl)
+{
+    _stone_stew_maybe_print_llm_flavour(mon,
+        "asking the player to judge a local dispute");
+    const int choice = _stone_stew_choose_moral_outcome(tmpl);
+    if (choice < 0)
+    {
+        mpr("You leave the dispute unresolved for now.");
+        mpr("You can review unresolved quests with <lightgrey>Ctrl+T</lightgrey>.");
+        return true;
+    }
+
+    mpr(_stone_stew_substitute(tmpl.choices[choice].player_line));
+    mpr(_stone_stew_substitute(tmpl.choices[choice].result));
+    const int reward = _stone_stew_town_moral_reward(tmpl, choice);
+    if (reward > 0)
+    {
+        mprf("The town pays you %d gold pieces.", reward);
+        you.add_gold(reward);
+    }
+    you.props[_stone_stew_town_moral_key(STONE_STEW_TOWN_MORAL_OUTCOME_KEY)]
+        = choice;
+    if (!tmpl.choices[choice].unlock_training.empty())
+    {
+        you.props[_stone_stew_town_moral_key(
+            STONE_STEW_TOWN_MORAL_TRAINING_UNLOCK_KEY)] =
+            tmpl.choices[choice].unlock_training;
+        mprf("%s is now willing to arrange %s training.",
+             _stone_stew_current_moral_identity().name.c_str(),
+             tmpl.choices[choice].unlock_training.c_str());
+    }
+    _stone_stew_set_town_moral_state(SSQ_COMPLETED);
+    take_note(Note(NOTE_USER_NOTE, 0, 0, "",
+                   make_stringf("Resolved %s in %s.",
+                                tmpl.title.c_str(),
+                                _stone_stew_current_town_name().c_str())),
+              true);
+    return true;
 }
 
 static bool _stone_stew_townsperson_moral_quest(const monster& mon)
@@ -993,60 +1000,13 @@ static bool _stone_stew_townsperson_moral_quest(const monster& mon)
             return true;
         }
 
-        _stone_stew_town_moral_target_xl(*tmpl);
         _stone_stew_set_town_moral_state(SSQ_ACTIVE);
         mpr(_stone_stew_substitute(tmpl->accepted));
-        mpr("You can review accepted quests with <lightgrey>Ctrl+T</lightgrey>.");
-        return true;
+        return _stone_stew_resolve_moral_choice(mon, *tmpl);
     }
 
     if (state == SSQ_ACTIVE)
-    {
-        const int target_xl = _stone_stew_town_moral_target_xl(*tmpl);
-        if (you.experience_level < target_xl)
-        {
-            string incomplete = replace_all(_stone_stew_substitute(tmpl->incomplete),
-                                            "{target_xl}",
-                                            make_stringf("%d", target_xl));
-            mpr(incomplete);
-            return true;
-        }
-
-        _stone_stew_maybe_print_llm_flavour(mon, "asking the player to judge a local dispute");
-        const int choice = _stone_stew_choose_moral_outcome(*tmpl);
-        if (choice < 0)
-        {
-            mpr("You leave the dispute unresolved for now.");
-            return true;
-        }
-
-        mpr(_stone_stew_substitute(tmpl->choices[choice].player_line));
-        mpr(_stone_stew_substitute(tmpl->choices[choice].result));
-        const int reward = _stone_stew_town_moral_reward(*tmpl, choice);
-        if (reward > 0)
-        {
-            mprf("The town pays you %d gold pieces.", reward);
-            you.add_gold(reward);
-        }
-        you.props[_stone_stew_town_moral_key(STONE_STEW_TOWN_MORAL_OUTCOME_KEY)]
-            = choice;
-        if (!tmpl->choices[choice].unlock_training.empty())
-        {
-            you.props[_stone_stew_town_moral_key(
-                STONE_STEW_TOWN_MORAL_TRAINING_UNLOCK_KEY)] =
-                tmpl->choices[choice].unlock_training;
-            mprf("%s is now willing to arrange %s training.",
-                 _stone_stew_current_moral_identity().name.c_str(),
-                 tmpl->choices[choice].unlock_training.c_str());
-        }
-        _stone_stew_set_town_moral_state(SSQ_COMPLETED);
-        take_note(Note(NOTE_USER_NOTE, 0, 0, "",
-                       make_stringf("Resolved %s in %s.",
-                                    tmpl->title.c_str(),
-                                    _stone_stew_current_town_name().c_str())),
-                  true);
-        return true;
-    }
+        return _stone_stew_resolve_moral_choice(mon, *tmpl);
 
     mpr("This town's matter has already found its ending.");
     return true;
