@@ -3,7 +3,7 @@
 ##############################################################################
 
 NAME:   stone_stew_lair_town
-DEPTH:  LairTown
+DEPTH:  Forest
 TAGS:   no_monster_gen no_trap_gen no_rotate no_pool_fixup
 ORIENT: encompass
 KFEAT:  > = exit_lair_town
@@ -11,6 +11,8 @@ KFEAT:  A = altar_fedhas / altar_elyvilon / altar_cheibriados / altar_hepliaklqa
 KFEAT:  B = altar_okawaru / altar_trog / altar_gozag / altar_nemelex_xobeh / altar_qazlal / altar_uskayaw
 KFEAT:  S = general shop
 KFEAT:  F = fountain_blue
+KFEAT:  c = floor
+KFEAT:  v = floor
 KMONS:  W = human att:good_neutral name:Lantern_Warden name_replace ; spear . leather armour
 KMONS:  P = human att:good_neutral name:Town_Priest name_replace ; quarterstaff . robe
 KMONS:  H = human att:good_neutral name:Root_Hunter name_replace ; spear . leather armour

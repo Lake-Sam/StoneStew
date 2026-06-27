@@ -579,8 +579,8 @@ BRANCH_EXIT(DNGN_EXIT_SLIME, "staircase back to the Lair", "exit_slime_pits"),
 BRANCH_EXIT(DNGN_EXIT_ORC, "staircase back to the Dungeon", "exit_orcish_mines"),
 
 #if TAG_MAJOR_VERSION == 34
-BRANCH_ENTRANCE(DNGN_ENTER_DWARF, "staircase to a dungeon town", "enter_dungeon_town"),
-BRANCH_ENTRANCE(DNGN_ENTER_FOREST, "path to a Lair town", "enter_lair_town"),
+BRANCH_ENTRANCE(DNGN_ENTER_DWARF, "staircase to a lantern-lit town", "enter_dungeon_town"),
+BRANCH_ENTRANCE(DNGN_ENTER_FOREST, "path to a root-lit town", "enter_lair_town"),
 BRANCH_ENTRANCE(DNGN_ENTER_BLADE, "staircase to the Hall of Blades", "enter_hall_of_blades"),
 BRANCH_EXIT(DNGN_EXIT_DWARF, "staircase back to the Dungeon", "exit_dungeon_town"),
 BRANCH_EXIT(DNGN_EXIT_FOREST, "path back to the Lair", "exit_lair_town"),

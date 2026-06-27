@@ -11,6 +11,7 @@ KFEAT:  A = altar_okawaru / altar_elyvilon / altar_sif_muna / altar_gozag / alta
 KFEAT:  B = altar_trog / altar_fedhas / altar_nemelex_xobeh / altar_qazlal / altar_wu_jian / altar_uskayaw
 KFEAT:  S = general shop
 KFEAT:  F = fountain_blue
+KFEAT:  v = floor
 KMONS:  W = human att:good_neutral name:Lantern_Warden name_replace ; spear . ring mail
 KMONS:  P = human att:good_neutral name:Town_Priest name_replace ; quarterstaff . robe
 KMONS:  C = human att:good_neutral name:Town_Broker name_replace ; dagger . robe
