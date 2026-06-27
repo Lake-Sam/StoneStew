@@ -38,6 +38,14 @@ static const char *STONE_STEW_MID_DUNGEON_TOWN_NAME_KEY =
     "stone_stew_mid_dungeon_town_name";
 static const char *STONE_STEW_LAIR_TOWN_NAME_KEY =
     "stone_stew_lair_town_name";
+static const char *STONE_STEW_DUNGEON_TOWN_GUILD_KEY =
+    "stone_stew_dungeon_town_guild";
+static const char *STONE_STEW_LAIR_TOWN_GUILD_KEY =
+    "stone_stew_lair_town_guild";
+static const char *STONE_STEW_DUNGEON_TOWN_GUILD_JOINED_KEY =
+    "stone_stew_dungeon_town_guild_joined";
+static const char *STONE_STEW_LAIR_TOWN_GUILD_JOINED_KEY =
+    "stone_stew_lair_town_guild_joined";
 static const int STONE_STEW_RELLAN_FIGHTING_TRAINING_COST = 60;
 static const int STONE_STEW_RELLAN_FIGHTING_TRAINING_POINTS = 180;
 
@@ -70,6 +78,14 @@ struct stone_stew_quest_def
     int reward_gold;
     bool (*complete)();
     bool (*fail)();
+};
+
+struct stone_stew_guild_def
+{
+    const char *name;
+    const char *focus;
+    const char *theme;
+    const char *join_pitch;
 };
 
 static bool _stone_stew_rellan_complete()
@@ -248,6 +264,100 @@ static string _stone_stew_current_town_name()
         return _stone_stew_lair_town_name();
 
     return _stone_stew_mid_dungeon_town_name();
+}
+
+static int _stone_stew_persistent_index(const char *prop_key, int count)
+{
+    if (!you.props.exists(prop_key))
+        you.props[prop_key] = random2(count);
+
+    int index = you.props[prop_key].get_int();
+    if (index < 0 || index >= count)
+    {
+        index = 0;
+        you.props[prop_key] = index;
+    }
+
+    return index;
+}
+
+static const stone_stew_guild_def *_stone_stew_current_guild()
+{
+    static const stone_stew_guild_def dungeon_guilds[] =
+    {
+        {
+            "Lamplighters' Compact",
+            "safe-road scouting, warnings, and rescue contracts",
+            "lanterns, toll ledgers, and maps of half-cleared stairs",
+            "\"We pay for eyes that come back,\" the factor says."
+        },
+        {
+            "Copper Stair Fellowship",
+            "merchant errands, appraisals, and guarded deliveries",
+            "coin scales, sealed crates, and cautious trade routes",
+            "\"Every road has a price. Members learn which prices are fair.\""
+        },
+        {
+            "Grey Writ Company",
+            "bounties, dungeon surveys, and practical monster work",
+            "notice boards, weapon racks, and contracts stamped in grey wax",
+            "\"No glory clauses. Work, report, collect.\""
+        },
+    };
+    static const stone_stew_guild_def lair_guilds[] =
+    {
+        {
+            "Rootwarden Circle",
+            "beast paths, herbal remedies, and Lair survival",
+            "root charms, poultice bowls, and maps scratched into bark",
+            "\"The Lair kills the loud and the lost. We teach neither.\""
+        },
+        {
+            "Green Hunt Lodge",
+            "tracking, trophies, and dangerous-beast contracts",
+            "hide frames, spear racks, and careful sketches of tracks",
+            "\"Take only contracts you can walk away from.\""
+        },
+        {
+            "Venomwise Lodge",
+            "poison lore, antidote work, and swamp-road preparation",
+            "drying herbs, glass vials, and venom notes in a steady hand",
+            "\"Most venom is a question. Members learn the answer.\""
+        },
+    };
+
+    if (you.where_are_you == BRANCH_DWARF)
+    {
+        return &dungeon_guilds[
+            _stone_stew_persistent_index(STONE_STEW_DUNGEON_TOWN_GUILD_KEY,
+                                         ARRAYSZ(dungeon_guilds))];
+    }
+
+    if (you.where_are_you == BRANCH_FOREST)
+    {
+        return &lair_guilds[
+            _stone_stew_persistent_index(STONE_STEW_LAIR_TOWN_GUILD_KEY,
+                                         ARRAYSZ(lair_guilds))];
+    }
+
+    return nullptr;
+}
+
+static const char *_stone_stew_current_guild_joined_key()
+{
+    if (you.where_are_you == BRANCH_DWARF)
+        return STONE_STEW_DUNGEON_TOWN_GUILD_JOINED_KEY;
+
+    if (you.where_are_you == BRANCH_FOREST)
+        return STONE_STEW_LAIR_TOWN_GUILD_JOINED_KEY;
+
+    return nullptr;
+}
+
+static bool _stone_stew_current_guild_joined()
+{
+    const char *key = _stone_stew_current_guild_joined_key();
+    return key && you.props.exists(key) && you.props[key].get_bool();
 }
 
 bool stone_stew_is_town_npc(const monster& mon)
@@ -457,6 +567,7 @@ enum stone_stew_dialogue_action
     SSDA_QUEST,
     SSDA_TRADE,
     SSDA_TRAINING,
+    SSDA_GUILD,
 };
 
 static bool _stone_stew_town_npc_talk(const monster& mon)
@@ -507,8 +618,18 @@ static bool _stone_stew_town_npc_talk(const monster& mon)
 
     if (mon.mname == "Guild Factor")
     {
-        mpr("\"Guild writs are sealed for now,\" the factor says. "
-            "\"Earn a name in the deep roads and doors will notice.\"");
+        const stone_stew_guild_def *guild = _stone_stew_current_guild();
+        if (guild)
+        {
+            mprf("\"%s keeps a chapter of the %s,\" the factor says. "
+                 "\"Ask about Guild work if you want your name in the book.\"",
+                 _stone_stew_current_town_name().c_str(), guild->name);
+        }
+        else
+        {
+            mpr("\"Guild writs are sealed for now,\" the factor says. "
+                "\"Earn a name in the deep roads and doors will notice.\"");
+        }
         return true;
     }
 
@@ -740,6 +861,11 @@ static bool _stone_stew_town_npc_has_training(const monster& mon)
     return _stone_stew_rellan_training_available(mon);
 }
 
+static bool _stone_stew_town_npc_has_guild(const monster& mon)
+{
+    return mon.mname == "Guild Factor" && _stone_stew_current_guild();
+}
+
 static bool _stone_stew_town_npc_trade(const monster& mon)
 {
     if (mon.mname == "Mara the Coinwise")
@@ -789,6 +915,50 @@ static bool _stone_stew_town_npc_training(const monster& mon)
     return true;
 }
 
+static bool _stone_stew_town_npc_guild(const monster& mon)
+{
+    if (mon.mname != "Guild Factor")
+    {
+        mpr("They are not handling guild business right now.");
+        return true;
+    }
+
+    const stone_stew_guild_def *guild = _stone_stew_current_guild();
+    if (!guild)
+    {
+        mpr("There is no guild chapter here yet.");
+        return true;
+    }
+
+    mprf("<yellow>%s</yellow>", guild->name);
+    mprf("Focus: %s.", guild->focus);
+    mprf("Chapter hall: %s.", guild->theme);
+
+    if (_stone_stew_current_guild_joined())
+    {
+        mprf("\"You are already on the rolls of the %s,\" the factor says. "
+             "\"Proper contracts will follow once the guild boards open.\"",
+             guild->name);
+        return true;
+    }
+
+    mpr(guild->join_pitch);
+    const string prompt = make_stringf("Join the %s?", guild->name);
+    if (!yesno(prompt.c_str(), true, 'n'))
+    {
+        mpr("\"No ink spent, then,\" the factor says.");
+        return true;
+    }
+
+    const char *key = _stone_stew_current_guild_joined_key();
+    if (key)
+        you.props[key].get_bool() = true;
+
+    mprf("You join the %s.", guild->name);
+    mpr("Guild quests and rewards are not active yet, but your membership is recorded for this run.");
+    return true;
+}
+
 static string _stone_stew_dialogue_action_name(stone_stew_dialogue_action action)
 {
     switch (action)
@@ -801,6 +971,8 @@ static string _stone_stew_dialogue_action_name(stone_stew_dialogue_action action
         return "Trade";
     case SSDA_TRAINING:
         return "Training";
+    case SSDA_GUILD:
+        return "Guild";
     }
 
     return "";
@@ -821,6 +993,9 @@ static vector<stone_stew_dialogue_action> _stone_stew_dialogue_actions(
 
     if (_stone_stew_town_npc_has_training(mon))
         actions.push_back(SSDA_TRAINING);
+
+    if (_stone_stew_town_npc_has_guild(mon))
+        actions.push_back(SSDA_GUILD);
 
     return actions;
 }
@@ -849,6 +1024,8 @@ static bool _stone_stew_run_dialogue_action(stone_stew_dialogue_action action,
         return _stone_stew_town_npc_trade(mon);
     case SSDA_TRAINING:
         return _stone_stew_town_npc_training(mon);
+    case SSDA_GUILD:
+        return _stone_stew_town_npc_guild(mon);
     }
 
     return true;
@@ -877,6 +1054,9 @@ static bool _stone_stew_try_shortcut_action(
         break;
     case 'n':
         action = SSDA_TRAINING;
+        break;
+    case 'g':
+        action = SSDA_GUILD;
         break;
     default:
         matched = false;
