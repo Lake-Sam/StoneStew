@@ -18,6 +18,7 @@
 #include "prompt.h"
 #include "scroller.h"
 #include "shopping.h"
+#include "skills.h"
 #include "stringutil.h"
 #include "travel.h"
 
@@ -29,7 +30,11 @@ static const char *STONE_STEW_BETHRA_QUEST_KEY =
     "stone_stew_bethra_road_coin_quest";
 static const char *STONE_STEW_BETHRA_SECOND_QUEST_KEY =
     "stone_stew_bethra_second_purse_quest";
+static const char *STONE_STEW_RELLAN_FIGHTING_TRAINING_KEY =
+    "stone_stew_rellan_fighting_training";
 static const char *STONE_STEW_TOWN_HOME_KEY = "stone_stew_town_home";
+static const int STONE_STEW_RELLAN_FIGHTING_TRAINING_COST = 60;
+static const int STONE_STEW_RELLAN_FIGHTING_TRAINING_POINTS = 180;
 
 enum stone_stew_quest_state
 {
@@ -223,6 +228,15 @@ static bool _stone_stew_quest_prereq_met(const stone_stew_quest_def& quest)
 static bool _stone_stew_quest_failed(const stone_stew_quest_def& quest)
 {
     return quest.fail && quest.fail();
+}
+
+static int _stone_stew_quest_state_by_key(const char *key)
+{
+    for (int i = 0; i < STONE_STEW_NUM_QUESTS; ++i)
+        if (STONE_STEW_QUESTS[i].prop_key == key)
+            return _stone_stew_quest_state(STONE_STEW_QUESTS[i]);
+
+    return SSQ_UNOFFERED;
 }
 
 static string _stone_stew_quest_offer_text(const stone_stew_quest_def& quest)
@@ -583,9 +597,18 @@ static bool _stone_stew_town_npc_has_trade(const monster& mon)
     return mon.mname == "Mara the Coinwise";
 }
 
-static bool _stone_stew_town_npc_has_training(const monster&)
+static bool _stone_stew_rellan_training_available(const monster& mon)
 {
-    return false;
+    return mon.mname == "Old Rellan"
+           && _stone_stew_quest_state_by_key(STONE_STEW_RELLAN_QUEST_KEY)
+              >= SSQ_COMPLETED
+           && !you.props.exists(STONE_STEW_RELLAN_FIGHTING_TRAINING_KEY)
+           && you.skills[SK_FIGHTING] < 5;
+}
+
+static bool _stone_stew_town_npc_has_training(const monster& mon)
+{
+    return _stone_stew_rellan_training_available(mon);
 }
 
 static bool _stone_stew_town_npc_trade(const monster& mon)
@@ -600,8 +623,39 @@ static bool _stone_stew_town_npc_trade(const monster& mon)
     return true;
 }
 
-static bool _stone_stew_town_npc_training(const monster&)
+static bool _stone_stew_town_npc_training(const monster& mon)
 {
+    if (_stone_stew_rellan_training_available(mon))
+    {
+        const string prompt = make_stringf(
+            "Pay Old Rellan %d gold for a Fighting drill?",
+            STONE_STEW_RELLAN_FIGHTING_TRAINING_COST);
+
+        if (you.gold < STONE_STEW_RELLAN_FIGHTING_TRAINING_COST)
+        {
+            mprf("\"Training costs %d gold,\" Old Rellan says. "
+                 "\"Come back with coin enough to respect the lesson.\"",
+                 STONE_STEW_RELLAN_FIGHTING_TRAINING_COST);
+            return true;
+        }
+
+        if (!yesno(prompt.c_str(), true, 'n'))
+        {
+            mpr("\"Another time, then,\" Old Rellan says.");
+            return true;
+        }
+
+        you.del_gold(STONE_STEW_RELLAN_FIGHTING_TRAINING_COST);
+        change_skill_points(SK_FIGHTING,
+                            STONE_STEW_RELLAN_FIGHTING_TRAINING_POINTS,
+                            true);
+        you.skills_to_show.insert(SK_FIGHTING);
+        you.props[STONE_STEW_RELLAN_FIGHTING_TRAINING_KEY] = 1;
+        mpr("\"Good,\" Old Rellan says. \"Keep your shoulders under your fear.\"");
+        mpr("Your Fighting skill improves from Old Rellan's drill.");
+        return true;
+    }
+
     mpr("They are not offering training right now.");
     return true;
 }
