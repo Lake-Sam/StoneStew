@@ -58,6 +58,14 @@ static const char *STONE_STEW_DUNGEON_TOWN_GUILD_BENEFIT_KEY =
     "stone_stew_dungeon_town_guild_benefit";
 static const char *STONE_STEW_LAIR_TOWN_GUILD_BENEFIT_KEY =
     "stone_stew_lair_town_guild_benefit";
+static const char *STONE_STEW_DUNGEON_WARDEN_FIGHTING_KEY =
+    "stone_stew_dungeon_warden_fighting_training";
+static const char *STONE_STEW_DUNGEON_BROKER_ARMOUR_KEY =
+    "stone_stew_dungeon_broker_armour_training";
+static const char *STONE_STEW_LAIR_HUNTER_DODGING_KEY =
+    "stone_stew_lair_hunter_dodging_training";
+static const char *STONE_STEW_LAIR_HEALER_STEALTH_KEY =
+    "stone_stew_lair_healer_stealth_training";
 static const int STONE_STEW_RELLAN_FIGHTING_TRAINING_COST = 60;
 static const int STONE_STEW_RELLAN_FIGHTING_TRAINING_POINTS = 180;
 static const int STONE_STEW_GUILD_BENEFIT_SKILL_POINTS = 220;
@@ -115,6 +123,21 @@ struct stone_stew_guild_survey_def
     int reward_gold;
 };
 
+struct stone_stew_training_def
+{
+    const char *prop_key;
+    const char *trainer;
+    branch_type branch;
+    skill_type skill;
+    const char *label;
+    int cost;
+    int skill_points;
+    const char *offer;
+    const char *declined;
+    const char *poor;
+    const char *complete;
+};
+
 static bool _stone_stew_rellan_complete()
 {
     return you.experience_level >= 2;
@@ -134,6 +157,69 @@ static bool _stone_stew_bethra_second_complete()
 {
     return you.gold >= 75;
 }
+
+static const stone_stew_training_def STONE_STEW_TRAINING[] =
+{
+    {
+        STONE_STEW_DUNGEON_WARDEN_FIGHTING_KEY,
+        "Lantern Warden",
+        BRANCH_DWARF,
+        SK_FIGHTING,
+        "Fighting",
+        120,
+        220,
+        "\"Road stance, shield shoulder, panic breath,\" the warden says. "
+        "\"I can drill the basics into you.\"",
+        "\"Keep your coin, then. Keep your balance too.\"",
+        "\"Training costs 120 gold,\" the warden says. \"Come back solvent.\"",
+        "\"Better,\" the warden says. \"The road hits back. Hit first.\"",
+    },
+    {
+        STONE_STEW_DUNGEON_BROKER_ARMOUR_KEY,
+        "Town Broker",
+        BRANCH_DWARF,
+        SK_ARMOUR,
+        "Armour",
+        140,
+        220,
+        "\"Most people wear armour like a locked door,\" the broker says. "
+        "\"Pay me and I will show you where it hinges.\"",
+        "\"No fitting, no fee,\" the broker says.",
+        "\"A proper fitting costs 140 gold,\" the broker says.",
+        "\"There,\" the broker says. \"Less clatter, fewer bruises.\"",
+    },
+    {
+        STONE_STEW_LAIR_HUNTER_DODGING_KEY,
+        "Root Hunter",
+        BRANCH_FOREST,
+        SK_DODGING,
+        "Dodging",
+        160,
+        240,
+        "\"Roots trip the proud,\" the hunter says. \"Pay me and I will teach "
+        "your feet to listen.\"",
+        "\"The roots can wait,\" the hunter says.",
+        "\"Trailwork costs 160 gold,\" the hunter says.",
+        "\"Good. You moved before the branch asked twice.\"",
+    },
+    {
+        STONE_STEW_LAIR_HEALER_STEALTH_KEY,
+        "Lair Healer",
+        BRANCH_FOREST,
+        SK_STEALTH,
+        "Stealth",
+        150,
+        230,
+        "\"Quiet bodies need fewer stitches,\" the healer says. "
+        "\"I can teach you how not to announce your wounds.\"",
+        "\"Noise remains free,\" the healer says.",
+        "\"Quiet instruction costs 150 gold,\" the healer says.",
+        "\"Softer steps. Fewer salves. A fair trade.\"",
+    },
+};
+
+static const int STONE_STEW_NUM_TRAINING =
+    static_cast<int>(ARRAYSZ(STONE_STEW_TRAINING));
 
 static const stone_stew_quest_def STONE_STEW_QUESTS[] =
 {
@@ -445,10 +531,14 @@ static string _stone_stew_skill_name(skill_type skill)
 {
     switch (skill)
     {
+    case SK_ARMOUR:
+        return "Armour";
     case SK_DODGING:
         return "Dodging";
     case SK_FIGHTING:
         return "Fighting";
+    case SK_STEALTH:
+        return "Stealth";
     default:
         return "skill";
     }
@@ -1104,9 +1194,27 @@ static bool _stone_stew_rellan_training_available(const monster& mon)
            && you.skills[SK_FIGHTING] < 5;
 }
 
+static const stone_stew_training_def *_stone_stew_paid_training_for(
+    const monster& mon)
+{
+    for (int i = 0; i < STONE_STEW_NUM_TRAINING; ++i)
+    {
+        const stone_stew_training_def& training = STONE_STEW_TRAINING[i];
+        if (mon.mname == training.trainer
+            && you.where_are_you == training.branch
+            && !you.props.exists(training.prop_key))
+        {
+            return &training;
+        }
+    }
+
+    return nullptr;
+}
+
 static bool _stone_stew_town_npc_has_training(const monster& mon)
 {
-    return _stone_stew_rellan_training_available(mon);
+    return _stone_stew_rellan_training_available(mon)
+           || _stone_stew_paid_training_for(mon);
 }
 
 static bool _stone_stew_town_npc_has_guild(const monster& mon)
@@ -1164,6 +1272,36 @@ static bool _stone_stew_town_npc_training(const monster& mon)
         you.props[STONE_STEW_RELLAN_FIGHTING_TRAINING_KEY] = 1;
         mpr("\"Good,\" Old Rellan says. \"Keep your shoulders under your fear.\"");
         mpr("Your Fighting skill improves from Old Rellan's drill.");
+        return true;
+    }
+
+    if (const stone_stew_training_def *training =
+            _stone_stew_paid_training_for(mon))
+    {
+        mpr(training->offer);
+        const string prompt = make_stringf(
+            "Pay %s %d gold for %s training?",
+            training->trainer, training->cost, training->label);
+
+        if (you.gold < training->cost)
+        {
+            mpr(training->poor);
+            return true;
+        }
+
+        if (!yesno(prompt.c_str(), true, 'n'))
+        {
+            mpr(training->declined);
+            return true;
+        }
+
+        you.del_gold(training->cost);
+        change_skill_points(training->skill, training->skill_points, true);
+        you.skills_to_show.insert(training->skill);
+        you.props[training->prop_key] = 1;
+        mpr(training->complete);
+        mprf("Your %s skill improves from the lesson.",
+             _stone_stew_skill_name(training->skill).c_str());
         return true;
     }
 

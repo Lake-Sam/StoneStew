@@ -20,7 +20,11 @@ KMONS:  B = human att:good_neutral name:Bertha_of_the_Cot name_replace ; club . 
 KMONS:  T = human att:good_neutral name:townsperson name_replace ; nothing
 KFEAT:  S = general shop
 KFEAT:  F = fountain_blue
-FTILE:  .{+SMQBGT = floor_pebble_brown / floor_pebble_darkgray / none
+KITEM:  1 = firestarter pre_id
+KITEM:  2 = crystal plate armour mundane pre_id plus:8
+KITEM:  3 = ring of slaying plus:8 pre_id, potion of experience q:2 pre_id
+KITEM:  4 = scroll of acquirement q:3 pre_id, gold q:2000
+FTILE:  .{+SMQBGT1234 = floor_pebble_brown / floor_pebble_darkgray / none
 FTILE:  v = floor_grass_dark
 MAP
 vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
@@ -43,8 +47,8 @@ vvvvvvxxxxxxxxxx+++xxxxxxxxvvvvvvvv
 vvvvvvvvvvvvvvv.....vvvvvvvvvvvvvvv
 vvvvvvvvvvvvvv.......vvvvvvvvvvvvvv
 vvvvvvvvvvvvv.........vvvvvvvvvvvvv
-vvvvvvvvvvvv....xxx....vvvvvvvvvvvv
-vvvvvvvvvvv....xx@xx....vvvvvvvvvvv
+vvvvvvvvvvvv.1..xxx..2.vvvvvvvvvvvv
+vvvvvvvvvvv..3.xx@xx.4..vvvvvvvvvvv
 vvvvvvvvvv....xx...xx....vvvvvvvvvv
 ENDMAP
 
