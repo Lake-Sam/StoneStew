@@ -50,8 +50,17 @@ static const char *STONE_STEW_DUNGEON_TOWN_SURVEY_KEY =
     "stone_stew_dungeon_town_survey";
 static const char *STONE_STEW_LAIR_TOWN_SURVEY_KEY =
     "stone_stew_lair_town_survey";
+static const char *STONE_STEW_DUNGEON_TOWN_GUILD_RANK_KEY =
+    "stone_stew_dungeon_town_guild_rank";
+static const char *STONE_STEW_LAIR_TOWN_GUILD_RANK_KEY =
+    "stone_stew_lair_town_guild_rank";
+static const char *STONE_STEW_DUNGEON_TOWN_GUILD_BENEFIT_KEY =
+    "stone_stew_dungeon_town_guild_benefit";
+static const char *STONE_STEW_LAIR_TOWN_GUILD_BENEFIT_KEY =
+    "stone_stew_lair_town_guild_benefit";
 static const int STONE_STEW_RELLAN_FIGHTING_TRAINING_COST = 60;
 static const int STONE_STEW_RELLAN_FIGHTING_TRAINING_POINTS = 180;
+static const int STONE_STEW_GUILD_BENEFIT_SKILL_POINTS = 220;
 
 enum stone_stew_quest_state
 {
@@ -376,6 +385,84 @@ static bool _stone_stew_current_guild_joined()
 {
     const char *key = _stone_stew_current_guild_joined_key();
     return key && you.props.exists(key) && you.props[key].get_bool();
+}
+
+static const char *_stone_stew_current_guild_rank_key()
+{
+    if (you.where_are_you == BRANCH_DWARF)
+        return STONE_STEW_DUNGEON_TOWN_GUILD_RANK_KEY;
+
+    if (you.where_are_you == BRANCH_FOREST)
+        return STONE_STEW_LAIR_TOWN_GUILD_RANK_KEY;
+
+    return nullptr;
+}
+
+static const char *_stone_stew_current_guild_benefit_key()
+{
+    if (you.where_are_you == BRANCH_DWARF)
+        return STONE_STEW_DUNGEON_TOWN_GUILD_BENEFIT_KEY;
+
+    if (you.where_are_you == BRANCH_FOREST)
+        return STONE_STEW_LAIR_TOWN_GUILD_BENEFIT_KEY;
+
+    return nullptr;
+}
+
+static int _stone_stew_current_guild_rank()
+{
+    const char *key = _stone_stew_current_guild_rank_key();
+    if (!key || !you.props.exists(key))
+        return 0;
+
+    return you.props[key].get_int();
+}
+
+static void _stone_stew_set_current_guild_rank(int rank)
+{
+    const char *key = _stone_stew_current_guild_rank_key();
+    if (!key)
+        return;
+
+    you.props[key] = max(_stone_stew_current_guild_rank(), rank);
+}
+
+static bool _stone_stew_current_guild_benefit_used()
+{
+    const char *key = _stone_stew_current_guild_benefit_key();
+    return key && you.props.exists(key) && you.props[key].get_bool();
+}
+
+static skill_type _stone_stew_current_guild_benefit_skill()
+{
+    if (you.where_are_you == BRANCH_FOREST)
+        return SK_DODGING;
+
+    return SK_FIGHTING;
+}
+
+static string _stone_stew_skill_name(skill_type skill)
+{
+    switch (skill)
+    {
+    case SK_DODGING:
+        return "Dodging";
+    case SK_FIGHTING:
+        return "Fighting";
+    default:
+        return "skill";
+    }
+}
+
+static string _stone_stew_current_guild_rank_name()
+{
+    if (!_stone_stew_current_guild_joined())
+        return "outsider";
+
+    if (_stone_stew_current_guild_rank() >= 1)
+        return "trusted hand";
+
+    return "probationary member";
 }
 
 static const stone_stew_guild_survey_def *_stone_stew_current_survey()
@@ -728,6 +815,7 @@ enum stone_stew_dialogue_action
     SSDA_TRAINING,
     SSDA_GUILD,
     SSDA_GUILD_WORK,
+    SSDA_GUILD_BENEFIT,
 };
 
 static bool _stone_stew_town_npc_talk(const monster& mon)
@@ -1107,6 +1195,7 @@ static bool _stone_stew_town_npc_guild(const monster& mon)
         mprf("\"You are already on the rolls of the %s,\" the factor says. "
              "\"Check Guild Work if you want a posted contract.\"",
              guild->name);
+        mprf("Standing: %s.", _stone_stew_current_guild_rank_name().c_str());
         return true;
     }
 
@@ -1177,6 +1266,9 @@ static bool _stone_stew_town_npc_guild_work(const monster& mon)
             mprf("The guild pays you %d gold pieces.", survey->reward_gold);
             you.add_gold(survey->reward_gold);
             _stone_stew_set_survey_state(*survey, SSQ_COMPLETED);
+            _stone_stew_set_current_guild_rank(1);
+            mprf("Your standing rises to %s with this guild.",
+                 _stone_stew_current_guild_rank_name().c_str());
             return true;
         }
 
@@ -1191,6 +1283,66 @@ static bool _stone_stew_town_npc_guild_work(const monster& mon)
     }
 
     mpr("That guild contract is no longer available.");
+    return true;
+}
+
+static bool _stone_stew_town_npc_has_guild_benefit(const monster& mon)
+{
+    return mon.mname == "Guild Factor"
+           && _stone_stew_current_guild()
+           && _stone_stew_current_guild_joined()
+           && _stone_stew_current_guild_rank() >= 1
+           && !_stone_stew_current_guild_benefit_used();
+}
+
+static bool _stone_stew_town_npc_guild_benefit(const monster& mon)
+{
+    if (mon.mname != "Guild Factor")
+    {
+        mpr("They are not handling guild benefits right now.");
+        return true;
+    }
+
+    const stone_stew_guild_def *guild = _stone_stew_current_guild();
+    if (!guild || !_stone_stew_current_guild_joined())
+    {
+        mpr("You are not on this guild chapter's rolls.");
+        return true;
+    }
+
+    if (_stone_stew_current_guild_rank() < 1)
+    {
+        mpr("\"Finish a posted contract first,\" the factor says.");
+        return true;
+    }
+
+    if (_stone_stew_current_guild_benefit_used())
+    {
+        mpr("\"The chapter has already trained you for this posting,\" the factor says.");
+        return true;
+    }
+
+    const skill_type skill = _stone_stew_current_guild_benefit_skill();
+    const string skill_name = _stone_stew_skill_name(skill);
+    const string prompt = make_stringf(
+        "Claim your %s training benefit from the %s?",
+        skill_name.c_str(), guild->name);
+
+    if (!yesno(prompt.c_str(), true, 'n'))
+    {
+        mpr("\"The benefit stays on the ledger,\" the factor says.");
+        return true;
+    }
+
+    change_skill_points(skill, STONE_STEW_GUILD_BENEFIT_SKILL_POINTS, true);
+    you.skills_to_show.insert(skill);
+
+    const char *key = _stone_stew_current_guild_benefit_key();
+    if (key)
+        you.props[key].get_bool() = true;
+
+    mprf("The %s grants you practical %s training.",
+         guild->name, skill_name.c_str());
     return true;
 }
 
@@ -1210,6 +1362,8 @@ static string _stone_stew_dialogue_action_name(stone_stew_dialogue_action action
         return "Guild";
     case SSDA_GUILD_WORK:
         return "Guild Work";
+    case SSDA_GUILD_BENEFIT:
+        return "Guild Benefit";
     }
 
     return "";
@@ -1236,6 +1390,9 @@ static vector<stone_stew_dialogue_action> _stone_stew_dialogue_actions(
 
     if (_stone_stew_town_npc_has_guild_work(mon))
         actions.push_back(SSDA_GUILD_WORK);
+
+    if (_stone_stew_town_npc_has_guild_benefit(mon))
+        actions.push_back(SSDA_GUILD_BENEFIT);
 
     return actions;
 }
@@ -1268,6 +1425,8 @@ static bool _stone_stew_run_dialogue_action(stone_stew_dialogue_action action,
         return _stone_stew_town_npc_guild(mon);
     case SSDA_GUILD_WORK:
         return _stone_stew_town_npc_guild_work(mon);
+    case SSDA_GUILD_BENEFIT:
+        return _stone_stew_town_npc_guild_benefit(mon);
     }
 
     return true;
@@ -1302,6 +1461,9 @@ static bool _stone_stew_try_shortcut_action(
         break;
     case 'w':
         action = SSDA_GUILD_WORK;
+        break;
+    case 'b':
+        action = SSDA_GUILD_BENEFIT;
         break;
     default:
         matched = false;
